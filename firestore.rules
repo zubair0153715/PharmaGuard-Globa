@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - email: string (required) - User email
+    //   - displayName: string (optional) - User display name
+    //   - role: string (required) - 'user' or 'admin'
+    //   - createdAt: timestamp (required) - Creation time
+    //
+    // Collection: submissions
+    // Document ID: {submissionId}
+    // Fields:
+    //   - uid: string (required) - Owner UID
+    //   - fileName: string (required) - Name of the file
+    //   - checksum: string (optional) - MD5 hash
+    //   - healthScore: number (required) - Validation score
+    //   - status: string (required) - 'Pass' or 'Fail'
+    //   - isPdfA: bool (optional) - PDF/A compliance
+    //   - pdfAStandard: string (optional) - PDF/A standard version
+    //   - pdfAIssues: list (optional) - List of PDF/A issues
+    //   - isFileNameValid: bool (optional) - Naming convention check
+    //   - pageCount: number (optional) - Total pages
+    //   - metadata: map (optional) - PDF metadata
+    //   - aiAnalysis: map (optional) - AI extracted data
+    //   - suggestions: list (optional) - AI recommendations
+    //   - deepAudit: map (optional) - Regulatory audit results
+    //   - isFixed: bool (optional) - Whether AI fixed the issues
+    //   - correctedData: map (optional) - AI generated corrections
+    //   - createdAt: timestamp (required) - Submission time
+    //   - updatedAt: timestamp (optional) - Last update time
+    //   - timestamp: string (optional) - ISO timestamp from server
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "za0153715@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['user', 'admin'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidSubmission(data) {
+      return hasOnlyAllowedFields(['id', 'uid', 'fileName', 'checksum', 'healthScore', 'status', 'isPdfA', 'pdfAStandard', 'pdfAIssues', 'isFileNameValid', 'pageCount', 'metadata', 'aiAnalysis', 'suggestions', 'deepAudit', 'isFixed', 'correctedData', 'createdAt', 'updatedAt', 'timestamp']) &&
+             data.uid == request.auth.uid &&
+             data.fileName is string && data.fileName.size() <= 255 &&
+             data.healthScore is number && data.healthScore >= 0 && data.healthScore <= 100 &&
+             data.status in ['Pass', 'Fail'] &&
+             data.createdAt is timestamp &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidSubmission(request.resource.data);
+      allow update: if isDocOwner() && isValidSubmission(request.resource.data);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user-specific settings and profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "ValidationSubmission": {
+      "title": "Validation Submission",
+      "description": "Stores the results of a document validation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Document ID" },
+        "uid": { "type": "string", "description": "Owner UID" },
+        "fileName": { "type": "string" },
+        "checksum": { "type": "string" },
+        "healthScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pass", "Fail"] },
+        "isPdfA": { "type": "boolean" },
+        "pdfAStandard": { "type": "string" },
+        "pdfAIssues": { "type": "array" },
+        "isFileNameValid": { "type": "boolean" },
+        "pageCount": { "type": "number" },
+        "metadata": { "type": "object" },
+        "aiAnalysis": {
+          "type": "object",
+          "properties": {
+            "productName": { "type": "string" },
+            "batchNumber": { "type": "string" },
+            "stabilityStudyFound": { "type": "boolean" },
+            "summary": { "type": "string" },
+            "confidenceScore": { "type": "number" }
+          }
+        },
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "type": { "type": "string", "enum": ["info", "warning", "error"] },
+              "action": { "type": "string" }
+            }
+          }
+        },
+        "deepAudit": {
+          "type": "object",
+          "properties": {
+            "report": { "type": "string" },
+            "nextSteps": { "type": "array", "items": { "type": "string" } },
+            "complianceStatus": { "type": "string", "enum": ["Compliant", "Non-Compliant", "Warning"] }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isFixed": { "type": "boolean" },
+        "correctedData": { "type": "object" }
+      },
+      "required": ["uid", "fileName", "healthScore", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/submissions/{submissionId}": {
+      "schema": "ValidationSubmission",
+      "description": "Validation result documents"
+    }
+  }
+}
