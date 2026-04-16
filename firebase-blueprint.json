@@ -8,10 +8,14 @@
         "uid": { "type": "string", "description": "Firebase Auth UID" },
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
-        "role": { "type": "string", "enum": ["user", "admin"] },
+        "role": { "type": "string", "enum": ["QA_Manager", "Regulatory_Officer", "Reviewer", "Admin"] },
+        "tenantId": { "type": "string", "description": "Company/Tenant ID for isolation" },
+        "companyName": { "type": "string" },
+        "subscriptionStatus": { "type": "string", "enum": ["trial", "active", "past_due", "canceled"] },
+        "stripeCustomerId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "email", "role"]
+      "required": ["uid", "email", "role", "tenantId"]
     },
     "ValidationSubmission": {
       "title": "Validation Submission",
@@ -20,6 +24,7 @@
       "properties": {
         "id": { "type": "string", "description": "Document ID" },
         "uid": { "type": "string", "description": "Owner UID" },
+        "tenantId": { "type": "string", "description": "Tenant ID for isolation" },
         "fileName": { "type": "string" },
         "checksum": { "type": "string" },
         "healthScore": { "type": "number" },
@@ -63,9 +68,65 @@
         "updatedAt": { "type": "string", "format": "date-time" },
         "timestamp": { "type": "string", "format": "date-time" },
         "isFixed": { "type": "boolean" },
-        "correctedData": { "type": "object" }
+        "correctedData": { "type": "object" },
+        "isSigned": { "type": "boolean" },
+        "signatureId": { "type": "string" }
       },
       "required": ["uid", "fileName", "healthScore", "status", "createdAt"]
+    },
+    "AuditTrail": {
+      "title": "Audit Trail",
+      "description": "21 CFR Part 11 compliant audit log of all system actions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string", "description": "User who performed the action" },
+        "tenantId": { "type": "string", "description": "Tenant ID for isolation" },
+        "userEmail": { "type": "string" },
+        "action": { "type": "string", "description": "Action performed (e.g., 'UPLOAD', 'SIGN', 'DELETE')" },
+        "resourceType": { "type": "string", "description": "Type of resource affected" },
+        "resourceId": { "type": "string", "description": "ID of resource affected" },
+        "details": { "type": "string", "description": "Human-readable description of the change" },
+        "previousState": { "type": "object", "description": "Data before change" },
+        "newState": { "type": "object", "description": "Data after change" },
+        "ipAddress": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "action", "resourceType", "timestamp"]
+    },
+    "Signature": {
+      "title": "Electronic Signature",
+      "description": "21 CFR Part 11 compliant electronic signature record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "tenantId": { "type": "string", "description": "Tenant ID for isolation" },
+        "userEmail": { "type": "string" },
+        "submissionId": { "type": "string" },
+        "reason": { "type": "string", "description": "Reason for signing (e.g., 'Review', 'Approval')" },
+        "meaning": { "type": "string", "description": "Regulatory meaning of signature" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "hash": { "type": "string", "description": "Cryptographic hash of the document at time of signing" }
+      },
+      "required": ["uid", "submissionId", "reason", "timestamp"]
+    },
+    "CustomRule": {
+      "title": "Custom Validation Rule",
+      "description": "User-defined validation rules for SFDA guidelines.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "tenantId": { "type": "string", "description": "Tenant ID for isolation" },
+        "name": { "type": "string", "description": "Rule name (e.g., 'Batch Number Format')" },
+        "description": { "type": "string", "description": "What the rule checks" },
+        "logic": { "type": "string", "description": "Natural language description of the logic for AI to follow" },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "logic", "severity", "isActive"]
     }
   },
   "firestore": {
@@ -76,6 +137,35 @@
     "/submissions/{submissionId}": {
       "schema": "ValidationSubmission",
       "description": "Validation result documents"
+    },
+    "/rules/{ruleId}": {
+      "schema": "CustomRule",
+      "description": "Custom validation rules"
+    },
+    "/audit_trail/{logId}": {
+      "schema": "AuditTrail",
+      "description": "21 CFR Part 11 Audit Trail logs"
+    },
+    "/signatures/{signatureId}": {
+      "schema": "Signature",
+      "description": "Electronic signature records"
+    },
+    "/logs/{logId}": {
+      "schema": {
+        "title": "AppLog",
+        "type": "object",
+        "properties": {
+          "level": { "type": "string", "enum": ["info", "warn", "error"] },
+          "category": { "type": "string" },
+          "message": { "type": "string" },
+          "stack": { "type": "string" },
+          "uid": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "metadata": { "type": "object" }
+        },
+        "required": ["level", "category", "message", "timestamp"]
+      },
+      "description": "Centralized application logs for monitoring"
     }
   }
 }
