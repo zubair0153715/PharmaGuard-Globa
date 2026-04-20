@@ -18,7 +18,8 @@ export const decryptData = (ciphertext: string): string => {
 };
 
 export const encryptObject = (obj: any, sensitiveFields: string[]): any => {
-  const encryptedObj = JSON.parse(JSON.stringify(obj));
+  if (!obj) return obj;
+  const encryptedObj = { ...obj };
   
   // Handle top-level fields
   sensitiveFields.forEach(field => {
@@ -29,6 +30,7 @@ export const encryptObject = (obj: any, sensitiveFields: string[]): any => {
 
   // Handle aiAnalysis nested fields
   if (encryptedObj.aiAnalysis) {
+    encryptedObj.aiAnalysis = { ...encryptedObj.aiAnalysis };
     sensitiveFields.forEach(field => {
       if (encryptedObj.aiAnalysis[field] && typeof encryptedObj.aiAnalysis[field] === 'string') {
         encryptedObj.aiAnalysis[field] = encryptData(encryptedObj.aiAnalysis[field]);
@@ -40,7 +42,8 @@ export const encryptObject = (obj: any, sensitiveFields: string[]): any => {
 };
 
 export const decryptObject = (obj: any, sensitiveFields: string[]): any => {
-  const decryptedObj = JSON.parse(JSON.stringify(obj));
+  if (!obj) return obj;
+  const decryptedObj = { ...obj };
   
   // Handle top-level fields
   sensitiveFields.forEach(field => {
@@ -51,6 +54,7 @@ export const decryptObject = (obj: any, sensitiveFields: string[]): any => {
 
   // Handle aiAnalysis nested fields
   if (decryptedObj.aiAnalysis) {
+    decryptedObj.aiAnalysis = { ...decryptedObj.aiAnalysis };
     sensitiveFields.forEach(field => {
       if (decryptedObj.aiAnalysis[field] && typeof decryptedObj.aiAnalysis[field] === 'string') {
         decryptedObj.aiAnalysis[field] = decryptData(decryptedObj.aiAnalysis[field]);

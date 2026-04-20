@@ -2,83 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
-    // Assumed Data Model
+    // Global Safety Net (Pillar 0)
     // ===============================================================
-    //
-    // Collection: users
-    // Document ID: {userId}
-    // Fields:
-    //   - uid: string (required) - Firebase Auth UID
-    //   - email: string (required) - User email
-    //   - displayName: string (optional) - User display name
-    //   - role: string (required) - 'QA_Manager', 'Regulatory_Officer', 'Reviewer', 'Admin'
-    //   - createdAt: timestamp (required) - Creation time
-    //
-    // Collection: submissions
-    // Document ID: {submissionId}
-    // Fields:
-    //   - uid: string (required) - Owner UID
-    //   - fileName: string (required) - Name of the file
-    //   - checksum: string (optional) - MD5 hash
-    //   - healthScore: number (required) - Validation score
-    //   - status: string (required) - 'Pass' or 'Fail'
-    //   - isPdfA: bool (optional) - PDF/A compliance
-    //   - pdfAStandard: string (optional) - PDF/A standard version
-    //   - pdfAIssues: list (optional) - List of PDF/A issues
-    //   - isFileNameValid: bool (optional) - Naming convention check
-    //   - pageCount: number (optional) - Total pages
-    //   - metadata: map (optional) - PDF metadata
-    //   - aiAnalysis: map (optional) - AI extracted data
-    //   - suggestions: list (optional) - AI recommendations
-    //   - deepAudit: map (optional) - Regulatory audit results
-    //   - isFixed: bool (optional) - Whether AI fixed the issues
-    //   - correctedData: map (optional) - AI generated corrections
-    //   - isSigned: bool (optional) - 21 CFR Part 11 signature status
-    //   - signatureId: string (optional) - Link to signature record
-    //   - createdAt: timestamp (required) - Submission time
-    //   - updatedAt: timestamp (optional) - Last update time
-    //   - timestamp: string (optional) - ISO timestamp from server
-    //
-    // Collection: audit_trail
-    // Document ID: {logId}
-    // Fields:
-    //   - uid: string (required) - User UID
-    //   - userEmail: string (optional) - User email
-    //   - action: string (required) - 'UPLOAD', 'SIGN', 'DELETE', etc.
-    //   - resourceType: string (required) - 'SUBMISSION', 'RULE', etc.
-    //   - resourceId: string (optional) - ID of affected resource
-    //   - details: string (optional) - Description
-    //   - previousState: map (optional) - Data before change
-    //   - newState: map (optional) - Data after change
-    //   - ipAddress: string (optional) - Client IP
-    //   - timestamp: timestamp (required) - Action time
-    //
-    // Collection: signatures
-    // Document ID: {signatureId}
-    // Fields:
-    //   - uid: string (required) - Signer UID
-    //   - userEmail: string (optional) - Signer email
-    //   - submissionId: string (required) - Document ID
-    //   - reason: string (required) - 'Review', 'Approval', etc.
-    //   - meaning: string (optional) - Regulatory meaning
-    //   - hash: string (optional) - Document hash
-    //   - timestamp: timestamp (required) - Signature time
-    //
-    // Collection: rules
-    // Document ID: {ruleId}
-    // Fields:
-    //   - uid: string (required) - Owner UID
-    //   - name: string (required) - Rule name
-    //   - description: string (optional) - Rule description
-    //   - logic: string (required) - Natural language logic
-    //   - severity: string (required) - 'info', 'warning', 'error'
-    //   - isActive: bool (required) - Active status
-    //   - createdAt: timestamp (required) - Creation time
-    //
-    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
     // ===============================================================
-    // Helper Functions
+    // Shared Primitives & Helpers
     // ===============================================================
     
     function isAuthenticated() {
@@ -89,133 +20,208 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    function getTenantId() {
-      return getUserData().tenantId;
+    function incoming() {
+      return request.resource.data;
     }
 
-    function isSameTenant(data) {
-      return isAuthenticated() && data.tenantId == getTenantId();
+    function existing() {
+      return resource.data;
+    }
+
+    function isSystemAdmin() {
+      return isAuthenticated() && request.auth.token.email == "za0153715@gmail.com";
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
-        (getUserData().role == 'Admin' ||
-         (request.auth.token.email == "za0153715@gmail.com" && request.auth.token.email_verified == true));
-    }
-
-    function isQA() {
-      return isAuthenticated() && getUserData().role == 'QA_Manager';
-    }
-
-    function isRegulatory() {
-      return isAuthenticated() && getUserData().role == 'Regulatory_Officer';
-    }
-
-    function isReviewer() {
-      return isAuthenticated() && getUserData().role == 'Reviewer';
+      return isSystemAdmin() || (isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'Admin');
     }
 
     function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+      return email is string && email.size() <= 255 && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+    function hasOnlyAllowedFields(data, fields) {
+      return fields.hasAll(data.keys());
     }
 
     // ===============================================================
-    // Domain Validators
+    // Entity Validators (The Blueprints)
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'tenantId', 'companyName', 'subscriptionStatus', 'stripeCustomerId', 'createdAt']) &&
+      return hasOnlyAllowedFields(data, ['uid', 'email', 'displayName', 'photoURL', 'company', 'companyName', 'role', 'tenantId', 'subscriptionStatus', 'subscriptionPlan', 'subscriptionId', 'twoCheckoutCustomerId', 'orderReference', 'monthlyUsage', 'usageLimit', 'createdAt', 'lastLogin', 'sfdaMode', 'language', 'stripeCustomerId']) &&
              data.uid == request.auth.uid &&
              isValidEmail(data.email) &&
              data.role in ['QA_Manager', 'Regulatory_Officer', 'Reviewer', 'Admin'] &&
-             data.tenantId is string &&
-             data.createdAt is timestamp;
+             data.tenantId is string && data.tenantId.size() <= 128;
     }
 
     function isValidSubmission(data) {
-      return hasOnlyAllowedFields(['id', 'uid', 'tenantId', 'fileName', 'checksum', 'healthScore', 'status', 'isPdfA', 'pdfAStandard', 'pdfAIssues', 'isFileNameValid', 'pageCount', 'metadata', 'aiAnalysis', 'suggestions', 'deepAudit', 'isFixed', 'correctedData', 'isSigned', 'signatureId', 'createdAt', 'updatedAt', 'timestamp', 'isEncrypted']) &&
-             data.uid == request.auth.uid &&
-             data.tenantId == getTenantId() &&
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'fileName', 'checksum', 'healthScore', 'status', 'isPdfA', 'pdfAStandard', 'pdfAIssues', 'isFileNameValid', 'pageCount', 'metadata', 'aiAnalysis', 'suggestions', 'deepAudit', 'isFixed', 'correctedData', 'isSigned', 'signatureId', 'createdAt', 'updatedAt', 'timestamp', 'isEncrypted', 'version', 'previousVersionId', 'capaId', 'workflowStatus']) &&
              data.fileName is string && data.fileName.size() <= 255 &&
-             data.healthScore is number && data.healthScore >= 0 && data.healthScore <= 100 &&
              data.status in ['Pass', 'Fail'] &&
-             data.createdAt is timestamp;
+             data.uid is string && data.tenantId is string;
     }
 
     function isValidAuditTrail(data) {
-      return hasOnlyAllowedFields(['id', 'uid', 'tenantId', 'userEmail', 'action', 'resourceType', 'resourceId', 'details', 'previousState', 'newState', 'ipAddress', 'timestamp', 'isEncrypted']) &&
-             data.uid == request.auth.uid &&
-             data.tenantId == getTenantId() &&
-             data.action is string &&
-             data.resourceType is string &&
-             data.timestamp is timestamp;
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'userEmail', 'action', 'resourceType', 'resourceId', 'details', 'previousState', 'newState', 'ipAddress', 'timestamp', 'isEncrypted']) &&
+             data.action is string && data.action.size() <= 100 &&
+             data.resourceType is string && data.resourceType.size() <= 50;
     }
 
     function isValidSignature(data) {
-      return hasOnlyAllowedFields(['id', 'uid', 'tenantId', 'userEmail', 'submissionId', 'reason', 'meaning', 'hash', 'timestamp', 'isEncrypted']) &&
-             data.uid == request.auth.uid &&
-             data.tenantId == getTenantId() &&
-             data.submissionId is string &&
-             data.reason is string &&
-             data.timestamp is timestamp;
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'userEmail', 'submissionId', 'reason', 'meaning', 'hash', 'timestamp', 'isEncrypted']) &&
+             data.reason is string && data.reason.size() <= 500 &&
+             data.submissionId is string;
     }
 
     function isValidCustomRule(data) {
-      return hasOnlyAllowedFields(['id', 'uid', 'tenantId', 'name', 'description', 'logic', 'severity', 'isActive', 'createdAt']) &&
-             data.uid == request.auth.uid &&
-             data.tenantId == getTenantId() &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-             data.logic is string && data.logic.size() > 0 && data.logic.size() <= 1000 &&
-             data.severity in ['info', 'warning', 'error'] &&
-             data.isActive is bool &&
-             data.createdAt is timestamp;
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'name', 'description', 'logic', 'severity', 'isActive', 'createdAt']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.logic is string && data.logic.size() <= 2000;
+    }
+
+    function isValidCAPA(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'submissionId', 'title', 'description', 'rootCause', 'investigation', 'preventiveAction', 'status', 'severity', 'createdBy', 'assignedTo', 'createdAt', 'resolvedAt']) &&
+             data.title is string && data.title.size() <= 255;
+    }
+
+    function isValidVendor(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'name', 'serviceType', 'riskLevel', 'status', 'lastAuditAt', 'nextAuditAt']) &&
+             data.name is string && data.name.size() <= 255;
+    }
+
+    function isValidChangeControl(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'title', 'description', 'reason', 'impactAnalysis', 'status', 'priority', 'createdAt']) &&
+             data.title is string && data.title.size() <= 255;
+    }
+
+    function isValidStabilityStudy(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'productName', 'batchNumber', 'condition', 'startDate', 'timepoints', 'status']) &&
+             data.productName is string && data.productName.size() <= 255;
+    }
+
+    function isValidAssetCalibration(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'assetId', 'assetName', 'location', 'lastCalibrationDate', 'nextCalibrationDate', 'status']) &&
+             data.assetName is string && data.assetName.size() <= 255;
+    }
+
+    function isValidBatchRelease(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'batchNumber', 'productName', 'qaReviewStatus', 'productionReviewStatus', 'finalReleaseStatus', 'qpSignatureId', 'releasedAt']) &&
+             data.batchNumber is string && data.batchNumber.size() <= 50;
+    }
+
+    function isValidTrainingRecord(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'submissionId', 'documentTitle', 'completedAt']) &&
+             data.documentTitle is string && data.documentTitle.size() <= 255;
+    }
+
+    function isValidAdverseEvent(data) {
+       return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'productName', 'patientInitials', 'description', 'severity', 'causality', 'reportedAt', 'status']) &&
+              data.productName is string && data.productName.size() <= 255;
     }
 
     // ===============================================================
-    // Rules
+    // Collection Match Blocks
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || (isAuthenticated() && getUserData().tenantId == get(/databases/$(database)/documents/users/$(userId)).data.tenantId && isAdmin());
-      allow create: if isAuthenticated() && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow get: if isOwner(userId) || isSystemAdmin();
+      allow get, list: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated() && isValidUser(incoming()) && 
+                      (isOwner(userId) || isSystemAdmin() || isAdmin());
+      allow update: if (isOwner(userId) || isSystemAdmin() || isAdmin()) && (
+        // Allow updating specific profile and usage fields
+        incoming().diff(existing()).affectedKeys().hasOnly(['lastLogin', 'sfdaMode', 'language', 'displayName', 'photoURL', 'companyName', 'monthlyUsage'])
+        ||
+        // Allow admins to update roles and limits
+        ((isSystemAdmin() || isAdmin()) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'usageLimit', 'subscriptionPlan', 'subscriptionStatus']))
+      );
     }
 
     match /submissions/{submissionId} {
-      allow read: if isSameTenant(resource.data);
-      allow create: if isAuthenticated() && isValidSubmission(request.resource.data);
-      allow update: if isSameTenant(resource.data) && (isDocOwner() || isAdmin() || isQA()) && isValidSubmission(request.resource.data);
-      allow delete: if isSameTenant(resource.data) && isAdmin();
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidSubmission(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin()) && isValidSubmission(incoming());
+      allow delete: if isSystemAdmin() || isAdmin();
     }
 
     match /audit_trail/{logId} {
-      allow create: if isAuthenticated() && isValidAuditTrail(request.resource.data);
-      allow read: if isSameTenant(resource.data) && (isAdmin() || isQA());
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidAuditTrail(incoming()) && incoming().uid == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /signatures/{signatureId} {
-      allow create: if isAuthenticated() && isValidSignature(request.resource.data);
-      allow read: if isSameTenant(resource.data);
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidSignature(incoming()) && incoming().uid == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /rules/{ruleId} {
-      allow read: if isSameTenant(resource.data);
-      allow create: if isAuthenticated() && isValidCustomRule(request.resource.data);
-      allow update: if isSameTenant(resource.data) && isDocOwner() && isValidCustomRule(request.resource.data);
-      allow delete: if isSameTenant(resource.data) && (isDocOwner() || isAdmin());
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidCustomRule(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidCustomRule(incoming());
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
-    match /logs/{logId} {
-      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
-      allow read: if isAdmin();
+    match /capas/{capaId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidCAPA(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidCAPA(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /training_records/{recordId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidTrainingRecord(incoming()) && incoming().uid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /vendors/{vendorId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidVendor(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidVendor(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /change_controls/{ccId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidChangeControl(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidChangeControl(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /stability_studies/{studyId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidStabilityStudy(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidStabilityStudy(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /asset_calibrations/{assetId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidAssetCalibration(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidAssetCalibration(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /batch_releases/{releaseId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidBatchRelease(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidBatchRelease(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /adverse_events/{eventId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isSystemAdmin() || isAdmin());
+      allow create: if isAuthenticated() && isValidAdverseEvent(incoming()) && incoming().uid == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin()) && isValidAdverseEvent(incoming());
+      allow delete: if isAdmin();
     }
 
     match /test/connection {

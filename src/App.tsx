@@ -57,8 +57,46 @@ import {
   ArrowRight,
   Star,
   Users,
-  Zap
+  Zap,
+  GraduationCap,
+  Stethoscope,
+  Globe2,
+  Cpu,
+  FileBox,
+  ClipboardCheck,
+  PackageCheck,
+  Factory,
+  Newspaper,
+  HeartPulse,
+  GitCompare,
+  Truck,
+  FileSearch,
+  Rss,
+  ArrowLeftRight,
+  ShieldAlert as RiskIcon,
+  CalendarDays,
+  BarChart4,
+  PieChart as PieChartIcon,
+  TrendingUp,
+  TriangleAlert,
+  Wrench,
+  KeyRound
 } from "lucide-react";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -69,13 +107,12 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import * as pdfjsLib from "pdfjs-dist";
 // @ts-ignore
 import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { loadStripe } from "@stripe/stripe-js";
 import { 
   auth, 
   db, 
@@ -84,10 +121,7 @@ import {
   OperationType 
 } from "./firebase";
 
-// Initialize Stripe
-const stripePromise = (import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY 
-  ? loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY) 
-  : null;
+// 2Checkout doesn't require a client-side library for basic buy-links
 import { 
   signInWithPopup, 
   onAuthStateChanged, 
@@ -107,7 +141,8 @@ import {
   getDoc,
   deleteDoc,
   updateDoc,
-  increment
+  increment,
+  limit as fsLimit
 } from "firebase/firestore";
 import { handleError, ErrorCategory } from "./lib/error-handler";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -118,6 +153,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface ValidationResult {
   id?: string;
+  uid: string;
+  tenantId: string;
   fileName: string;
   checksum: string;
   isFileNameValid: boolean;
@@ -128,6 +165,7 @@ interface ValidationResult {
   metadata: any;
   healthScore: number;
   status: "Pass" | "Fail";
+  workflowStatus?: "DRAFT" | "IN_REVIEW" | "APPROVED" | "REJECTED" | "SIGNED";
   timestamp: string;
   aiAnalysis?: {
     stabilityStudyFound: boolean;
@@ -135,17 +173,118 @@ interface ValidationResult {
     batchNumber: string;
     summary: string;
     confidenceScore: number; // 0 to 100
-  };
+  } | string;
   suggestions?: {
     text: string;
     action?: string;
     type: "info" | "warning" | "error";
-  }[];
+  }[] | string[];
+  deepAudit?: string;
   isFixed?: boolean;
   correctedData?: any;
   isSigned?: boolean;
   signatureId?: string;
   isEncrypted?: boolean;
+  createdAt?: any;
+  updatedAt?: any;
+  capaId?: string;
+  version?: number;
+  previousVersionId?: string;
+}
+
+interface AdverseEvent {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  productName: string;
+  patientInitials: string;
+  description: string;
+  severity: "Mild" | "Moderate" | "Severe" | "Fatal";
+  causality: "Certain" | "Possible" | "Unlikely" | "Not Related";
+  reportedAt: any;
+  status: "Initial" | "Follow_up" | "Closed";
+}
+
+interface RegulatoryUpdate {
+  id: string;
+  source: "SFDA" | "EMA" | "FDA" | "ICH";
+  title: string;
+  summary: string;
+  url: string;
+  date: string;
+  category: "Policy" | "Safety" | "Guideline";
+}
+
+interface Vendor {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  name: string;
+  serviceType: string;
+  riskLevel: "Low" | "Medium" | "High";
+  status: "Qualified" | "On_Watch" | "Disqualified";
+  lastAuditAt: any;
+  nextAuditAt: any;
+}
+
+interface ChangeControl {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  title: string;
+  description: string;
+  reason: string;
+  impactAnalysis: string;
+  status: "Draft" | "Pending_Approval" | "Implemented" | "Closed";
+  priority: "Low" | "Medium" | "High";
+  createdAt: any;
+}
+
+interface RiskAssessment {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  process: string;
+  hazard: string;
+  severity: number; // 1-10
+  probability: number; // 1-10
+  detectability: number; // 1-10
+  rpn: number; // Severity * Probability * Detectability
+  mitigation: string;
+  status: "Open" | "Mitigated";
+}
+
+interface InternalAudit {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  department: string;
+  auditor: string;
+  scheduledDate: any;
+  status: "Scheduled" | "Completed" | "Follow_up";
+  findingsCount: number;
+}
+
+interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+  company?: string;
+  role: "QA_Manager" | "Regulatory_Officer" | "Reviewer" | "Admin";
+  tenantId: string;
+  companyName?: string;
+  subscriptionStatus?: "trial" | "active" | "past_due" | "canceled";
+  subscriptionPlan?: "starter" | "pro" | "enterprise";
+  stripeCustomerId?: string;
+  subscriptionId?: string;
+  monthlyUsage: number;
+  usageLimit: number;
+  createdAt: any;
+  sfdaMode?: boolean;
+  language?: "en" | "ar";
+  lastLogin: any;
+  trainingProgress?: Record<string, boolean>;
 }
 
 interface AuditLog {
@@ -177,25 +316,31 @@ interface SignatureRecord {
   isEncrypted?: boolean;
 }
 
-interface UserProfile {
+interface CAPARecord {
+  id?: string;
   uid: string;
-  email: string;
-  displayName: string;
-  photoURL: string;
-  company?: string;
-  role: "QA_Manager" | "Regulatory_Officer" | "Reviewer" | "Admin";
   tenantId: string;
-  companyName?: string;
-  subscriptionStatus?: "trial" | "active" | "past_due" | "canceled";
-  subscriptionPlan?: "starter" | "pro" | "enterprise";
-  stripeCustomerId?: string;
-  subscriptionId?: string;
-  monthlyUsage: number;
-  usageLimit: number;
+  submissionId: string;
+  title: string;
+  description: string;
+  rootCause: string;
+  investigation: string;
+  preventiveAction: string;
+  status: "Open" | "In_Progress" | "Resolved" | "Verified";
+  severity: "Critical" | "Major" | "Minor";
+  createdBy: string;
+  assignedTo?: string;
   createdAt: any;
-  sfdaMode?: boolean;
-  language?: "en" | "ar";
-  lastLogin: any;
+  resolvedAt?: any;
+}
+
+interface TrainingRecord {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  submissionId: string;
+  documentTitle: string;
+  completedAt: any;
 }
 
 interface CustomRule {
@@ -213,6 +358,42 @@ interface CustomRule {
 interface ChatMessage {
   role: "user" | "model";
   parts: { text: string }[];
+}
+
+interface StabilityStudy {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  productName: string;
+  batchNumber: string;
+  condition: string; 
+  startDate: any;
+  timepoints: { label: string; status: "Pending" | "Completed" | "Failed"; date: any }[];
+  status: "Active" | "Completed" | "Failed";
+}
+
+interface AssetCalibration {
+  id?: string;
+  uid: string;
+  tenantId: string;
+  assetId: string;
+  assetName: string;
+  location: string;
+  lastCalibrationDate: any;
+  nextCalibrationDate: any;
+  status: "Valid" | "Expired" | "Pending";
+}
+
+interface BatchRelease {
+  id?: string;
+  uid: string;
+  batchNumber: string;
+  productName: string;
+  qaReviewStatus: "Passed" | "Failed" | "Pending";
+  productionReviewStatus: "Passed" | "Failed" | "Pending";
+  finalReleaseStatus: "Released" | "Quarantined" | "Rejected" | "Pending";
+  qpSignatureId?: string;
+  releasedAt?: any;
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -269,6 +450,44 @@ const translations = {
     prioritySupport: "Priority Support",
     apiAccess: "API Access",
     customTraining: "Custom AI Training",
+    workflow: "Approval Workflow",
+    training: "Training Portal",
+    capa: "CAPA Management",
+    ectd: "eCTD Publisher",
+    erp: "ERP Connector",
+    approvalStage: "Approval Stage",
+    submitForReview: "Submit for Review",
+    approve: "Approve",
+    requestChanges: "Request Changes",
+    trainingComplete: "Training Completed",
+    rootCause: "Root Cause Analysis",
+    preventiveAction: "Preventive Action",
+    publishToSFDA: "Publish to SFDA eCTD",
+    erpLive: "Live ERP Feed (Batch Tracking)",
+    regulatoryIntel: "Regulatory Intelligence",
+    safetySignals: "Pharmacovigilance (PV)",
+    vendorManagement: "Vendor & Supplier QMS",
+    versionCompare: "Version Comparison",
+    advancedSearch: "Pharma Deep Search",
+    adverseEvents: "Adverse Events",
+    reportedBy: "Reported By",
+    causality: "Causality",
+    auditStatus: "Audit Status",
+    newsFeed: "Recent Regulatory Updates",
+    sfdaAlert: "SFDA Alert",
+    batchRecall: "Batch Recall Alert",
+    changeControl: "Change Control Management",
+    riskManagement: "Quality Risk Management",
+    auditPlanning: "Internal Audit Planner",
+    executiveDashboard: "Executive Insights",
+    impactAnalysis: "Impact Analysis",
+    riskRPN: "RPN Score",
+    scheduledAudits: "Scheduled Audits",
+    qualityTrend: "Quality Compliance Trends",
+    stabilityManagement: "Stability Study Management",
+    assetCalibration: "Calibration & Maintenance",
+    batchRelease: "Batch Release Cockpit",
+    qpPortal: "Qualified Person (QP) Portal",
   },
   ar: {
     dashboard: "لوحة تحكم الامتثال",
@@ -321,6 +540,44 @@ const translations = {
     prioritySupport: "دعم ذو أولوية",
     apiAccess: "وصول API",
     customTraining: "تدريب مخصص للذكاء الاصطناعي",
+    workflow: "سير العمل والاعتمادات",
+    training: "بوابة التدريب",
+    capa: "إدارة الإجراءات التصحيحية (CAPA)",
+    ectd: "ناشر eCTD",
+    erp: "رابط برامج التصنيع (ERP)",
+    approvalStage: "مرحلة الاعتماد",
+    submitForReview: "إرسال للمراجعة",
+    approve: "اعتماد",
+    requestChanges: "طلب تعديلات",
+    trainingComplete: "اكتمل التدريب",
+    rootCause: "تحليل السبب الجذري",
+    preventiveAction: "الإجراء الوقائي",
+    publishToSFDA: "نشر إلى eCTD الهيئة",
+    erpLive: "تغذية ERP الحية (تتبع الدفعات)",
+    regulatoryIntel: "استقصاء الأنظمة واللوائح",
+    safetySignals: "التيقظ الدوائي (PV)",
+    vendorManagement: "إدارة الموردين والجودة",
+    versionCompare: "مقارنة الإصدارات",
+    advancedSearch: "البحث الصيدلاني العميق",
+    adverseEvents: "الأعراض الجانبية",
+    reportedBy: "تم الإبلاغ بواسطة",
+    causality: "السببية",
+    auditStatus: "حالة المراجعة",
+    newsFeed: "تحديثات الأنظمة الأخيرة",
+    sfdaAlert: "تنبيه الهيئة",
+    batchRecall: "تنبيه سحب التشغيلة",
+    changeControl: "إدارة التحكم في التغيير",
+    riskManagement: "إدارة مخاطر الجودة",
+    auditPlanning: "مخطط التدقيق الداخلي",
+    executiveDashboard: "رؤى التنفيذيين",
+    impactAnalysis: "تحليل الأثر",
+    riskRPN: "درجة الأولوية للمخاطر",
+    scheduledAudits: "التدقيقات المجدولة",
+    qualityTrend: "اتجاهات امتثال الجودة",
+    stabilityManagement: "إدارة دراسات الاستقرار",
+    assetCalibration: "المعايرة والصيانة",
+    batchRelease: "غرفة إفراج التشغيلات",
+    qpPortal: "بوابة الشخص المسؤول (QP)",
   }
 };
 
@@ -330,7 +587,7 @@ const PRICING_PLANS = [
     name: "Starter",
     price: "$49",
     interval: "month",
-    priceId: "price_starter_monthly",
+    priceId: (import.meta as any).env.VITE_TWO_CHECKOUT_PRICE_STARTER || "starter_plan",
     features: ["Up to 50 validations/mo", "Basic Audit Trail", "Email Support"],
     limit: 50,
   },
@@ -339,7 +596,7 @@ const PRICING_PLANS = [
     name: "Professional",
     price: "$199",
     interval: "month",
-    priceId: "price_pro_monthly",
+    priceId: (import.meta as any).env.VITE_TWO_CHECKOUT_PRICE_PRO || "pro_plan",
     features: ["Unlimited Validations", "21 CFR Part 11 Signatures", "Priority Support", "API Access"],
     recommended: true,
     limit: 1000000, // Effectively unlimited
@@ -349,7 +606,7 @@ const PRICING_PLANS = [
     name: "Enterprise",
     price: "Custom",
     interval: "year",
-    priceId: "price_enterprise_yearly",
+    priceId: (import.meta as any).env.VITE_TWO_CHECKOUT_PRICE_ENTERPRISE || "enterprise_plan",
     features: ["Custom AI Training", "On-premise Deployment", "Dedicated Account Manager", "SLA Guarantees"],
     limit: 10000000,
   }
@@ -373,6 +630,29 @@ const safeJsonParse = (text: string) => {
     }
     throw e;
   }
+};
+
+const robustFetch = async (url: string, options: any = {}, maxRetries = 2) => {
+  let lastError;
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for large PDFs
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      if (err.name === 'AbortError') {
+        throw new Error(`The request timed out after 60 seconds.`);
+      }
+      if (i < maxRetries) {
+        console.warn(`Fetch attempt ${i + 1} failed, retrying...`, err);
+        await new Promise(r => setTimeout(r, 2000)); // Wait 2s before retry
+      }
+    }
+  }
+  throw lastError;
 };
 
 function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" | "ar", setLanguage: (l: "en" | "ar") => void, onBackToLanding: () => void }) {
@@ -401,9 +681,75 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
   const [isComplianceOpen, setIsComplianceOpen] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isSigning, setIsSigning] = useState(false);
+  const [isBackendReady, setIsBackendReady] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (userProfile) {
+      if (userProfile.language) setLanguage(userProfile.language as "en" | "ar");
+      if (userProfile.sfdaMode !== undefined) setSfdaMode(userProfile.sfdaMode);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await fetch("/api/health");
+        setIsBackendReady(response.ok);
+      } catch (e) {
+        setIsBackendReady(false);
+      }
+    };
+    checkHealth();
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
   const [signatureReason, setSignatureReason] = useState("Review");
-  const [complianceTab, setComplianceTab] = useState<"audit" | "docs" | "api" | "privacy" | "billing" | "templates">("audit");
+  const [complianceTab, setComplianceTab] = useState<"audit" | "docs" | "api" | "privacy" | "billing" | "templates" | "capa" | "training" | "ectd" | "erp" | "pv" | "intel" | "vendors" | "search" | "change" | "risk" | "audits" | "exec" | "stability" | "assets" | "release">("audit");
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [capas, setCapas] = useState<CAPARecord[]>([]);
+  const [trainingRecords, setTrainingRecords] = useState<TrainingRecord[]>([]);
+  const [adverseEvents, setAdverseEvents] = useState<AdverseEvent[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [changeControls, setChangeControls] = useState<ChangeControl[]>([]);
+  const [risks, setRisks] = useState<RiskAssessment[]>([
+    { process: "Sterile Filling", hazard: "Filter Integrity Failure", severity: 9, probability: 2, detectability: 1, rpn: 18, mitigation: "Redundant filtration implemented", status: "Mitigated" },
+    { process: "Packaging", hazard: "Mislabeled Batch", severity: 10, probability: 1, detectability: 2, rpn: 20, mitigation: "Vision system integrated", status: "Mitigated" }
+  ]);
+  const [auditSchedule, setAuditSchedule] = useState<InternalAudit[]>([
+    { department: "Quality Control", auditor: "Lead Auditor A", scheduledDate: "2026-05-15", status: "Scheduled", findingsCount: 0 },
+    { department: "Production", auditor: "Lead Auditor B", scheduledDate: "2026-06-01", status: "Scheduled", findingsCount: 0 }
+  ]);
+  const [stabilityStudies, setStabilityStudies] = useState<StabilityStudy[]>([
+    { productName: "NeuroMed Forte", batchNumber: "BN-2026-11", condition: "25°C / 60% RH", startDate: "2026-01-01", status: "Active", timepoints: [
+      { label: "0m", status: "Completed", date: "2026-01-01" },
+      { label: "3m", status: "Completed", date: "2026-04-01" },
+      { label: "6m", status: "Pending", date: "2026-07-01" }
+    ]}
+  ]);
+  const [assetCalibrations, setAssetCalibrations] = useState<AssetCalibration[]>([
+    { assetId: "HPLC-004", assetName: "Agilent 1260 HPLC", location: "QC Lab 1", lastCalibrationDate: "2025-11-20", nextCalibrationDate: "2026-05-20", status: "Valid" },
+    { assetId: "BAL-012", assetName: "Mettler Balance", location: "Production Suite A", lastCalibrationDate: "2026-03-10", nextCalibrationDate: "2026-09-10", status: "Valid" }
+  ]);
+  const [batchReleases, setBatchReleases] = useState<BatchRelease[]>([
+    { batchNumber: "9921-A", productName: "Vaxipro-B", qaReviewStatus: "Passed", productionReviewStatus: "Passed", finalReleaseStatus: "Pending" }
+  ]);
+  const [regulatoryNews, setRegulatoryNews] = useState<RegulatoryUpdate[]>([
+    { id: "1", source: "SFDA", title: "New Guidelines for Bioavailability Studies", summary: "SFDA issued updated requirements for clinical data submissions.", url: "#", date: "2026-04-15", category: "Guideline" },
+    { id: "2", source: "FDA", title: "AI-Native Drug Discovery Policy", summary: "US FDA releases framework for AI-generated clinical trials.", url: "#", date: "2026-04-10", category: "Policy" },
+  ]);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
+  const [selectedCapa, setSelectedCapa] = useState<CAPARecord | null>(null);
+  const [erpData, setErpData] = useState({
+    activeBatches: 12,
+    todayYield: "98.4%",
+    pendingQC: 3,
+    criticalDeviations: 0,
+    recentAlerts: [
+      { id: 1, type: "Temp", message: "Cold storage unit B4 reached 6.2°C", time: "10 min ago" },
+      { id: 2, type: "QC", message: "Batch #4492 validation required", time: "45 min ago" }
+    ]
+  });
   const [activeSignature, setActiveSignature] = useState<SignatureRecord | null>(null);
   const [isSignatureDetailsOpen, setIsSignatureDetailsOpen] = useState(false);
   const [sfdaMode, setSfdaMode] = useState(false);
@@ -424,12 +770,24 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (isComplianceOpen) {
+      if (complianceTab === "audit" && !canViewAuditTrail()) {
+        setComplianceTab("docs");
+      } else if (complianceTab === "billing" && !canManageBilling()) {
+        setComplianceTab("docs");
+      } else if (complianceTab === "api" && !manageSystemSettings()) {
+        setComplianceTab("docs");
+      }
+    }
+  }, [isComplianceOpen, userProfile]);
+
   const toggleTheme = () => {
     setTheme(prev => prev === "light" ? "dark" : "light");
   };
 
   const logAuditAction = async (action: string, resourceType: string, resourceId?: string, details: string = "", previousState?: any, newState?: any) => {
-    if (!user || !userProfile) return;
+    if (!user || !userProfile || !userProfile.tenantId) return;
     try {
       const logData = {
         uid: user.uid,
@@ -454,13 +812,16 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeProfile: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);
       
       if (currentUser) {
-        // Ensure user profile exists
         const userRef = doc(db, "users", currentUser.uid);
+        
+        // Ensure user profile exists (one-time check)
         const userSnap = await getDoc(userRef);
         if (!userSnap.exists()) {
           const newProfile: UserProfile = {
@@ -468,37 +829,55 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
             email: currentUser.email!,
             displayName: currentUser.displayName || "User",
             photoURL: currentUser.photoURL || "",
-            role: "Reviewer", // Default role
-            tenantId: `tenant_${currentUser.uid.substring(0, 8)}`, // Default tenant
+            role: "Reviewer",
+            tenantId: `tenant_${currentUser.uid.substring(0, 8)}`,
             companyName: "Default Company",
             subscriptionStatus: "trial",
             subscriptionPlan: "starter",
             monthlyUsage: 0,
-            usageLimit: 5, // Free trial limit
+            usageLimit: 5,
+            sfdaMode: false,
+            language: "en",
             createdAt: serverTimestamp(),
             lastLogin: serverTimestamp()
           };
           await setDoc(userRef, newProfile);
-          setUserProfile(newProfile);
-        } else {
-          setUserProfile(userSnap.data() as UserProfile);
         }
+
+        // Start real-time listener
+        if (unsubscribeProfile) unsubscribeProfile();
+        unsubscribeProfile = onSnapshot(userRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as UserProfile;
+            setUserProfile(data);
+          }
+        }, (error) => {
+          handleError(error, ErrorCategory.FIRESTORE);
+        });
       } else {
+        if (unsubscribeProfile) {
+          unsubscribeProfile();
+          unsubscribeProfile = null;
+        }
         setUserProfile(null);
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }, []);
 
   useEffect(() => {
-    if (!user || !userProfile) {
+    if (!user || !userProfile || !userProfile.tenantId) {
       setHistory([]);
       return;
     }
 
     const q = query(
       collection(db, "submissions"),
-      where("tenantId", "==", userProfile.tenantId),
+      where("uid", "==", user.uid),
       orderBy("createdAt", "desc")
     );
 
@@ -522,17 +901,17 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, userProfile]);
 
   useEffect(() => {
-    if (!user || !userProfile) {
+    if (!user || !userProfile || !userProfile.tenantId) {
       setCustomRules([]);
       return;
     }
 
     const q = query(
       collection(db, "rules"),
-      where("tenantId", "==", userProfile.tenantId),
+      where("uid", "==", user.uid),
       orderBy("createdAt", "desc")
     );
 
@@ -547,18 +926,164 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, userProfile]);
 
   useEffect(() => {
-    if (!user || !userProfile || (userProfile.role !== "Admin" && userProfile.role !== "QA_Manager")) {
+    if (!user || !userProfile || !userProfile.tenantId) {
+      setCapas([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "capas"),
+      where("uid", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as CAPARecord[];
+      setCapas(docs);
+    }, (error) => {
+      handleError(error, ErrorCategory.FIRESTORE);
+    });
+
+    return () => unsubscribe();
+  }, [user, userProfile]);
+
+  useEffect(() => {
+    if (!user || !userProfile || !userProfile.tenantId) {
+      setTrainingRecords([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "training_records"),
+      where("uid", "==", user.uid),
+      orderBy("completedAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as TrainingRecord[];
+      setTrainingRecords(docs);
+    }, (error) => {
+      handleError(error, ErrorCategory.FIRESTORE);
+    });
+
+    return () => unsubscribe();
+  }, [user, userProfile]);
+
+  useEffect(() => {
+    if (!user || !userProfile || !userProfile.tenantId) {
+      setAdverseEvents([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "adverse_events"),
+      where("uid", "==", user.uid),
+      orderBy("reportedAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as AdverseEvent[];
+      setAdverseEvents(docs);
+    });
+
+    return () => unsubscribe();
+  }, [user, userProfile]);
+
+  useEffect(() => {
+    if (!user || !userProfile || !userProfile.tenantId) {
+      setVendors([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "vendors"),
+      where("uid", "==", user.uid),
+      orderBy("lastAuditAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Vendor[];
+      setVendors(docs);
+    });
+
+    return () => unsubscribe();
+  }, [user, userProfile]);
+
+  useEffect(() => {
+    if (!user || !userProfile || !userProfile.tenantId) {
+      setChangeControls([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "change_controls"),
+      where("uid", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as ChangeControl[];
+      setChangeControls(docs);
+    });
+
+    return () => unsubscribe();
+  }, [user, userProfile]);
+
+  useEffect(() => {
+    if (!user || !userProfile || !userProfile.tenantId) {
+      setStabilityStudies([]);
+      setAssetCalibrations([]);
+      setBatchReleases([]);
+      return;
+    }
+
+    const unsubStability = onSnapshot(query(collection(db, "stability_studies"), where("uid", "==", user.uid)), (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as StabilityStudy[];
+      if (docs.length > 0) setStabilityStudies(docs);
+    });
+
+    const unsubAssets = onSnapshot(query(collection(db, "asset_calibrations"), where("uid", "==", user.uid)), (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AssetCalibration[];
+      if (docs.length > 0) setAssetCalibrations(docs);
+    });
+
+    const unsubRelease = onSnapshot(query(collection(db, "batch_releases"), where("uid", "==", user.uid)), (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as BatchRelease[];
+      if (docs.length > 0) setBatchReleases(docs);
+    });
+
+    return () => { unsubStability(); unsubAssets(); unsubRelease(); };
+  }, [user, userProfile]);
+
+  useEffect(() => {
+    if (!user || !userProfile || !userProfile.tenantId || !canViewAuditTrail()) {
       setAuditLogs([]);
       return;
     }
 
     const q = query(
       collection(db, "audit_trail"),
-      where("tenantId", "==", userProfile.tenantId),
-      orderBy("timestamp", "desc")
+      where("uid", "==", user.uid),
+      orderBy("timestamp", "desc"),
+      fsLimit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -583,6 +1108,27 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
     return () => unsubscribe();
   }, [user, userProfile]);
 
+  // Permission helpers
+  const canManageRules = () => {
+    return userProfile && (userProfile.role === "Admin" || userProfile.role === "QA_Manager" || userProfile.role === "Regulatory_Officer");
+  };
+
+  const canViewAuditTrail = () => {
+    return userProfile && (userProfile.role === "Admin" || userProfile.role === "QA_Manager" || userProfile.role === "Regulatory_Officer");
+  };
+
+  const manageSystemSettings = () => {
+    return userProfile && userProfile.role === "Admin";
+  };
+
+  const canManageBilling = () => {
+    return userProfile && userProfile.role === "Admin";
+  };
+
+  const isReviewer = () => {
+    return userProfile && userProfile.role === "Reviewer";
+  };
+
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
@@ -593,17 +1139,12 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
   };
 
   const handleManageSubscription = async () => {
-    if (!userProfile?.stripeCustomerId) {
-      toast.error("No active subscription found");
-      return;
-    }
-
     try {
-      const response = await fetch("/api/create-portal-session", {
+      const response = await robustFetch("/api/create-portal-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerId: userProfile.stripeCustomerId,
+          customerId: userProfile?.twoCheckoutCustomerId,
         }),
       });
 
@@ -612,7 +1153,7 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
         window.location.href = session.url;
       }
     } catch (error) {
-      toast.error("Failed to open customer portal");
+      toast.error("Failed to open 2Checkout account portal");
     }
   };
 
@@ -623,7 +1164,7 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
     }
 
     try {
-      const response = await fetch("/api/create-subscription-session", {
+      const response = await robustFetch("/api/create-subscription-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -632,6 +1173,17 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
           userId: user.uid,
         }),
       });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Subscription Session Error:", text);
+        try {
+          const json = JSON.parse(text);
+          throw new Error(json.error || "Failed to create subscription session");
+        } catch (e) {
+          throw new Error(`Server returned ${response.status} but not JSON`);
+        }
+      }
 
       const session = await response.json();
       if (session.url) {
@@ -806,7 +1358,10 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
   };
 
   const handleSignDocument = async (submissionId: string, reason: string) => {
-    if (!user || !result) return;
+    if (!user || !userProfile || !userProfile.tenantId || !result) {
+      toast.error("User profile or session invalid. Please sign in again.");
+      return;
+    }
     setIsSigning(true);
     try {
       const signatureData: SignatureRecord = {
@@ -870,16 +1425,23 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
   };
 
   const handleSaveRule = async (rule: Partial<CustomRule>) => {
-    if (!user) return;
+    if (!user || !userProfile || !userProfile.tenantId) {
+      toast.error("User profile or session invalid. Please sign in again.");
+      return;
+    }
     setIsSavingRule(true);
     try {
-      const ruleData = {
+      const ruleData: any = {
         ...rule,
         uid: user.uid,
         tenantId: userProfile.tenantId,
-        createdAt: serverTimestamp(),
         isActive: rule.isActive ?? true,
       };
+      
+      if (!rule.id) {
+        ruleData.createdAt = serverTimestamp();
+      }
+
       if (rule.id) {
         await setDoc(doc(db, "rules", rule.id), ruleData, { merge: true });
         await logAuditAction("UPDATE_RULE", "RULE", rule.id, `Rule '${rule.name}' updated`, null, ruleData);
@@ -1170,8 +1732,8 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
       return;
     }
 
-    if (!user || !userProfile) {
-      toast.error("Please sign in to validate documents");
+    if (!user || !userProfile || !userProfile.tenantId) {
+      toast.error("Authentication incomplete. Please sign in again.");
       return;
     }
 
@@ -1202,7 +1764,7 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
         const formData = new FormData();
         formData.append("file", file);
 
-        const response = await fetch("/api/validate-document", {
+        const response = await robustFetch("/api/validate-document", {
           method: "POST",
           body: formData,
         });
@@ -1280,18 +1842,8 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
             contents: {
               parts: [
                 { text: `Analyze this pharmaceutical document (first page). 
-                Extract the following in JSON format: 
-                { 
-                  'stabilityStudyFound': boolean, 
-                  'productName': string, 
-                  'batchNumber': string, 
-                  'summary': string, 
-                  'confidenceScore': number,
-                  'suggestions': Array<{ text: string, type: 'info' | 'warning' | 'error', action?: string }>
-                }. 
-                The confidenceScore should be between 0 and 100. 
-                If information is missing, add an 'error' suggestion. 
-                If the document is not PDF/A compliant (based on metadata), add a 'warning' suggestion with action 'Fix PDF/A'.
+                Extract the core product information and perform compliance checks. 
+                If the document is not PDF/A compliant, include a suggestion with action 'Fix PDF/A'.
                 
                 ${rulesPrompt}
                 ${ectdPrompt}
@@ -1300,7 +1852,30 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
               ]
             },
             config: {
-              responseMimeType: "application/json"
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  stabilityStudyFound: { type: Type.BOOLEAN },
+                  productName: { type: Type.STRING },
+                  batchNumber: { type: Type.STRING },
+                  summary: { type: Type.STRING },
+                  confidenceScore: { type: Type.NUMBER },
+                  suggestions: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        text: { type: Type.STRING },
+                        type: { type: Type.STRING, enum: ["info", "warning", "error"] },
+                        action: { type: Type.STRING }
+                      },
+                      required: ["text", "type"]
+                    }
+                  }
+                },
+                required: ["stabilityStudyFound", "productName", "batchNumber", "summary", "confidenceScore"]
+              }
             }
           });
         } catch (aiError) {
@@ -1485,6 +2060,13 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
     >
       <Toaster position="top-center" />
       
+      {isBackendReady === false && (
+        <div className="bg-red-500/10 border-b border-red-500/20 px-6 py-2 flex items-center justify-center gap-2 text-red-500 text-xs font-medium">
+          <ShieldAlert className="w-4 h-4 animate-pulse" />
+          Backend services are currently unreachable. Retrying connection...
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="sticky top-0 z-50 glass border-b border-gray-200/50 dark:border-white/10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -1503,22 +2085,26 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
             <a href="#" id="nav-dashboard" className="hover:text-black dark:hover:text-white transition-colors">Dashboard</a>
             {user && (
               <>
-                <a 
-                  href="#" 
-                  onClick={(e) => { e.preventDefault(); setIsRulesOpen(true); }} 
-                  className="hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"
-                >
-                  <Settings2 className="w-4 h-4" />
-                  Validation Rules
-                </a>
-                <a 
-                  href="#" 
-                  onClick={(e) => { e.preventDefault(); setIsComplianceOpen(true); }} 
-                  className="hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"
-                >
-                  <Shield className="w-4 h-4" />
-                  Compliance
-                </a>
+                {canManageRules() && (
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); setIsRulesOpen(true); }} 
+                    className="hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                    Validation Rules
+                  </a>
+                )}
+                {canViewAuditTrail() && (
+                  <a 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); setIsComplianceOpen(true); }} 
+                    className="hover:text-black dark:hover:text-white transition-colors flex items-center gap-1"
+                  >
+                    <Shield className="w-4 h-4" />
+                    Compliance
+                  </a>
+                )}
               </>
             )}
             <a 
@@ -1564,15 +2150,22 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
               </div>
             )}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLanguage(language === "en" ? "ar" : "en")}
-              className="rounded-full w-9 h-9 hover:bg-gray-100 dark:hover:bg-white/10"
-              title={language === "en" ? "Switch to Arabic" : "Switch to English"}
-            >
-              <Languages className="w-4 h-4" />
-            </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  const newLang = language === "en" ? "ar" : "en";
+                  setLanguage(newLang);
+                  if (user) {
+                    const userRef = doc(db, "users", user.uid);
+                    await updateDoc(userRef, { language: newLang });
+                  }
+                }}
+                className="rounded-full w-9 h-9 hover:bg-gray-100 dark:hover:bg-white/10"
+                title={language === "en" ? "Switch to Arabic" : "Switch to English"}
+              >
+                <Languages className="w-4 h-4" />
+              </Button>
 
             <Button
               variant="ghost"
@@ -2128,34 +2721,44 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                         </div>
 
                         <div className="flex flex-wrap gap-3 pt-2">
-                          <Button 
-                            id="btn-deep-audit"
-                            onClick={handleDeepAudit} 
-                            disabled={isDeepAuditing}
-                            className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl gap-2"
-                          >
-                            {isDeepAuditing ? <Activity className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
-                            Deep Regulatory Audit
-                          </Button>
-                          <Button 
-                            id="btn-regulatory-check"
-                            variant="outline" 
-                            onClick={handleRegulatoryCheck}
-                            className="rounded-xl gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-                          >
-                            <Search className="w-4 h-4" />
-                            Regulatory Standard Check
-                          </Button>
-                          {result.suggestions && result.suggestions.some(s => s.type === "error" || s.type === "warning") && !result.isFixed && (
-                            <Button 
-                              id="btn-fix-all-ai"
-                              onClick={handleFixIssues}
-                              disabled={isFixing}
-                              className="bg-green-600 hover:bg-green-700 text-white rounded-xl gap-2"
-                            >
-                              {isFixing ? <Activity className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                              Fix All Issues (AI)
-                            </Button>
+                          {(canManageRules() || canViewAuditTrail()) ? (
+                            <>
+                              <Button 
+                                id="btn-deep-audit"
+                                onClick={handleDeepAudit} 
+                                disabled={isDeepAuditing || result.isSigned}
+                                className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl gap-2"
+                              >
+                                {isDeepAuditing ? <Activity className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+                                Deep Regulatory Audit
+                              </Button>
+                              <Button 
+                                id="btn-regulatory-check"
+                                variant="outline" 
+                                onClick={handleRegulatoryCheck}
+                                disabled={result.isSigned}
+                                className="rounded-xl gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                              >
+                                <Search className="w-4 h-4" />
+                                Regulatory Standard Check
+                              </Button>
+                              {result.suggestions && result.suggestions.some(s => s.type === "error" || s.type === "warning") && !result.isFixed && !result.isSigned && (
+                                <Button 
+                                  id="btn-fix-all-ai"
+                                  onClick={handleFixIssues}
+                                  disabled={isFixing}
+                                  className="bg-green-600 hover:bg-green-700 text-white rounded-xl gap-2"
+                                >
+                                  {isFixing ? <Activity className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                                  Fix All Issues (AI)
+                                </Button>
+                              )}
+                            </>
+                          ) : (
+                            <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-dashed border-gray-200 dark:border-white/10 flex items-center gap-2">
+                              <Lock className="w-3 h-3 text-gray-400" />
+                              <span className="text-[10px] text-gray-500 font-medium italic">Advanced AI tools restricted to QA & Reg Officers</span>
+                            </div>
                           )}
                         </div>
 
@@ -2479,15 +3082,17 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                                   <h4 className="font-semibold text-sm dark:text-white">{rule.name}</h4>
                                 </div>
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button 
-                                    id={`btn-delete-rule-${rule.id}`}
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-8 w-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                    onClick={() => rule.id && handleDeleteRule(rule.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
+                                  {(rule.uid === user?.uid || userProfile?.role === "Admin") && (
+                                    <Button 
+                                      id={`btn-delete-rule-${rule.id}`}
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                      onClick={() => rule.id && handleDeleteRule(rule.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                               <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">{rule.logic}</p>
@@ -2499,6 +3104,7 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                                   id={`btn-toggle-rule-${rule.id}`}
                                   variant="ghost" 
                                   size="sm" 
+                                  disabled={!(rule.uid === user?.uid || userProfile?.role === "Admin")}
                                   className={cn(
                                     "h-7 text-[10px] px-2 rounded-lg",
                                     rule.isActive ? "text-green-600 bg-green-50 dark:bg-green-900/20" : "text-gray-400 bg-gray-100 dark:bg-white/10"
@@ -2712,30 +3318,157 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                   <div className="w-64 border-r border-gray-100 dark:border-white/10 p-6 space-y-6 hidden md:block">
                     <div className="space-y-2">
                       <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold px-2">Navigation</p>
-                      <Button 
-                        variant={complianceTab === "audit" ? "default" : "ghost"} 
-                        className="w-full justify-start rounded-xl"
-                        onClick={() => setComplianceTab("audit")}
-                      >
-                        <AuditIcon className="w-4 h-4 mr-2" />
-                        Audit Trail
-                      </Button>
+                      {canViewAuditTrail() && (
+                        <Button 
+                          variant={complianceTab === "audit" ? "default" : "ghost"} 
+                          className="w-full justify-start rounded-xl"
+                          onClick={() => setComplianceTab("audit")}
+                        >
+                          <AuditIcon className="w-4 h-4 mr-2" />
+                          Audit Trail
+                        </Button>
+                      )}
                       <Button 
                         variant={complianceTab === "docs" ? "default" : "ghost"} 
                         className="w-full justify-start rounded-xl"
                         onClick={() => setComplianceTab("docs")}
                       >
                         <FileText className="w-4 h-4 mr-2" />
-                        Validation Docs
+                        {t.workflow}
                       </Button>
                       <Button 
-                        variant={complianceTab === "api" ? "default" : "ghost"} 
+                        variant={complianceTab === "training" ? "default" : "ghost"} 
                         className="w-full justify-start rounded-xl"
-                        onClick={() => setComplianceTab("api")}
+                        onClick={() => setComplianceTab("training")}
                       >
-                        <Activity className="w-4 h-4 mr-2" />
-                        Integrations
+                        <GraduationCap className="w-4 h-4 mr-2" />
+                        {t.training}
                       </Button>
+                      <Button 
+                        variant={complianceTab === "capa" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("capa")}
+                      >
+                        <Stethoscope className="w-4 h-4 mr-2" />
+                        {t.capa}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "ectd" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("ectd")}
+                      >
+                        <Globe2 className="w-4 h-4 mr-2" />
+                        {t.ectd}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "erp" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("erp")}
+                      >
+                        <Cpu className="w-4 h-4 mr-2" />
+                        {t.erp}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "pv" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("pv")}
+                      >
+                        <HeartPulse className="w-4 h-4 mr-2" />
+                        {t.safetySignals}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "intel" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("intel")}
+                      >
+                        <Newspaper className="w-4 h-4 mr-2" />
+                        {t.regulatoryIntel}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "vendors" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("vendors")}
+                      >
+                        <Truck className="w-4 h-4 mr-2" />
+                        {t.vendorManagement}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "search" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("search")}
+                      >
+                        <FileSearch className="w-4 h-4 mr-2" />
+                        {t.advancedSearch}
+                      </Button>
+                      <Separator className="my-2 dark:bg-white/10" />
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold px-2">Management</p>
+                      <Button 
+                        variant={complianceTab === "exec" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("exec")}
+                      >
+                        <BarChart4 className="w-4 h-4 mr-2" />
+                        {t.executiveDashboard}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "change" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("change")}
+                      >
+                        <ArrowLeftRight className="w-4 h-4 mr-2" />
+                        {t.changeControl}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "risk" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("risk")}
+                      >
+                        <RiskIcon className="w-4 h-4 mr-2" />
+                        {t.riskManagement}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "audits" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("audits")}
+                      >
+                        <CalendarDays className="w-4 h-4 mr-2" />
+                        {t.auditPlanning}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "stability" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("stability")}
+                      >
+                        <Clock className="w-4 h-4 mr-2" />
+                        {t.stabilityManagement}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "assets" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("assets")}
+                      >
+                        <Settings2 className="w-4 h-4 mr-2" />
+                        {t.assetCalibration}
+                      </Button>
+                      <Button 
+                        variant={complianceTab === "release" ? "default" : "ghost"} 
+                        className="w-full justify-start rounded-xl"
+                        onClick={() => setComplianceTab("release")}
+                      >
+                        <KeyRound className="w-4 h-4 mr-2" />
+                        {t.batchRelease}
+                      </Button>
+                      <Separator className="my-2 dark:bg-white/10" />
+                      {manageSystemSettings() && (
+                        <Button 
+                          variant={complianceTab === "api" ? "default" : "ghost"} 
+                          className="w-full justify-start rounded-xl"
+                          onClick={() => setComplianceTab("api")}
+                        >
+                          <Activity className="w-4 h-4 mr-2" />
+                          Integrations
+                        </Button>
+                      )}
                       <Button 
                         variant={complianceTab === "privacy" ? "default" : "ghost"} 
                         className="w-full justify-start rounded-xl"
@@ -2744,14 +3477,16 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                         <Lock className="w-4 h-4 mr-2" />
                         Privacy & Security
                       </Button>
-                      <Button 
-                        variant={complianceTab === "billing" ? "default" : "ghost"} 
-                        className="w-full justify-start rounded-xl"
-                        onClick={() => setComplianceTab("billing")}
-                      >
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        {t.billing}
-                      </Button>
+                      {canManageBilling() && (
+                        <Button 
+                          variant={complianceTab === "billing" ? "default" : "ghost"} 
+                          className="w-full justify-start rounded-xl"
+                          onClick={() => setComplianceTab("billing")}
+                        >
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          {t.billing}
+                        </Button>
+                      )}
                       <Button 
                         variant={complianceTab === "templates" ? "default" : "ghost"} 
                         className="w-full justify-start rounded-xl"
@@ -2771,7 +3506,14 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                             variant="ghost" 
                             size="sm" 
                             className="h-6 w-12 p-0 bg-white dark:bg-white/10 rounded-full relative"
-                            onClick={() => setSfdaMode(!sfdaMode)}
+                            onClick={async () => {
+                              const newMode = !sfdaMode;
+                              setSfdaMode(newMode);
+                              if (user) {
+                                const userRef = doc(db, "users", user.uid);
+                                await updateDoc(userRef, { sfdaMode: newMode });
+                              }
+                            }}
                           >
                             <div className={cn(
                               "absolute w-4 h-4 rounded-full transition-all",
@@ -2858,78 +3600,69 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                     )}
 
                     {complianceTab === "docs" && (
-                      <ScrollArea className="flex-1 p-8">
-                        <div className="max-w-3xl mx-auto space-y-8">
-                          <div className="space-y-4">
-                            <h4 className="text-lg font-bold dark:text-white">GxP Validation Documentation</h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              PharmaGuard Global is a validated system. Below are the qualification documents required for regulatory audits.
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {[
-                              { title: "Installation Qualification (IQ)", desc: "Verifies system installation and environment setup.", date: "2024-03-10", type: "IQ" },
-                              { title: "Operational Qualification (OQ)", desc: "Tests system functionality against specifications.", date: "2024-03-12", type: "OQ" },
-                              { title: "Performance Qualification (PQ)", desc: "Confirms consistent performance in real-world scenarios.", date: "2024-03-15", type: "PQ" },
-                              { title: "Validation Summary Report (VSR)", desc: "Final sign-off on system validation status.", date: "2024-03-20", type: "VSR" },
-                              { title: "SFDA Drug Master File (DMF)", desc: "Saudi FDA specific template for drug master files.", date: "2024-04-01", type: "SFDA_DMF" },
-                              { title: "SFDA Stability Summary", desc: "Saudi FDA format for stability study summaries.", date: "2024-04-05", type: "SFDA_STAB" }
-                            ].map((doc, i) => (
-                              <Card key={i} className="dark:bg-white/5 border-gray-100 dark:border-white/10 hover:border-blue-500 transition-colors cursor-pointer">
-                                <CardHeader className="p-4">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <FileCheck className="w-5 h-5 text-blue-600" />
-                                    <Badge variant="outline" className="text-[10px] uppercase">Validated</Badge>
+                      <div className="flex-1 flex flex-col overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between">
+                          <h4 className="text-sm font-bold flex items-center gap-2 dark:text-white">
+                            <FileText className="w-4 h-4 text-gray-400" />
+                            {t.workflow} / Lifecycle Management
+                          </h4>
+                          <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-none">
+                            {history.length} Active Workflows
+                          </Badge>
+                        </div>
+                        <ScrollArea className="flex-1">
+                          <div className="p-6 space-y-4">
+                            {history.map((doc) => (
+                              <div key={doc.id} className="p-4 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center justify-between gap-4 group hover:border-blue-500 transition-colors">
+                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                  <div className={cn(
+                                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                                    doc.status === "Pass" ? "bg-green-50 dark:bg-green-900/20" : "bg-red-50 dark:bg-red-900/20"
+                                  )}>
+                                    <FileCheck className={cn("w-5 h-5", doc.status === "Pass" ? "text-green-600" : "text-red-600")} />
                                   </div>
-                                  <CardTitle className="text-sm dark:text-white">{doc.title}</CardTitle>
-                                  <CardDescription className="text-xs">{doc.desc}</CardDescription>
-                                </CardHeader>
-                                <CardFooter className="p-4 pt-0 flex justify-between items-center">
-                                  <span className="text-[10px] text-gray-400">Updated: {doc.date}</span>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-7 text-[10px]"
-                                    onClick={() => {
-                                      let content = `PharmaGuard Global - ${doc.title}\n\nDate: ${doc.date}\nStatus: Validated\n\n`;
-                                      
-                                      if (doc.type === "SFDA_DMF") {
-                                        content += "Saudi FDA Drug Master File (DMF) Requirements:\n1. General Information\n2. Manufacture of Active Substance\n3. Characterization\n4. Control of Active Substance\n5. Reference Standards\n6. Container Closure System\n7. Stability";
-                                      } else if (doc.type === "SFDA_STAB") {
-                                        content += "Saudi FDA Stability Study Summary Requirements:\n1. Batch Details\n2. Storage Conditions\n3. Testing Frequency\n4. Analytical Procedures\n5. Results and Statistical Analysis\n6. Shelf-life Conclusion";
-                                      } else {
-                                        content += `This is a GxP compliant ${doc.type} template for regulatory purposes.`;
-                                      }
-
-                                      const blob = new Blob([content], { type: 'text/plain' });
-                                      const url = URL.createObjectURL(blob);
-                                      const a = document.createElement('a');
-                                      a.href = url;
-                                      a.download = `PharmaGuard_${doc.type}_Template.txt`;
-                                      a.click();
-                                      toast.success(`${doc.type} Template downloaded`);
-                                    }}
-                                  >
-                                    Download Template
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h5 className="font-bold text-sm dark:text-white truncate">{doc.fileName}</h5>
+                                      <Badge variant="outline" className="text-[10px] uppercase">{doc.workflowStatus || "DRAFT"}</Badge>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-[10px] text-gray-400">Score: {doc.healthScore}%</span>
+                                      <Separator orientation="vertical" className="h-2" />
+                                      <span className="text-[10px] text-gray-400">ID: {doc.id?.substring(0, 8)}</span>
+                                      <Separator orientation="vertical" className="h-2" />
+                                      <span className="text-[10px] text-gray-400">{doc.timestamp}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {doc.workflowStatus === "DRAFT" && (
+                                    <Button size="sm" variant="outline" className="h-8 text-xs rounded-lg" onClick={() => updateDoc(doc(db, "submissions", doc.id!), { workflowStatus: "IN_REVIEW" })}>
+                                      Submit Review
+                                    </Button>
+                                  )}
+                                  {doc.workflowStatus === "IN_REVIEW" && ["QA_Manager", "Admin"].includes(userProfile?.role || "") && (
+                                    <div className="flex items-center gap-2">
+                                      <Button size="sm" variant="outline" className="h-8 text-xs rounded-lg text-red-600" onClick={() => updateDoc(doc(db, "submissions", doc.id!), { workflowStatus: "REJECTED" })}>
+                                        Reject
+                                      </Button>
+                                      <Button size="sm" className="h-8 text-xs rounded-lg bg-green-600 hover:bg-green-700 text-white" onClick={() => updateDoc(doc(db, "submissions", doc.id!), { workflowStatus: "APPROVED" })}>
+                                        Approve
+                                      </Button>
+                                    </div>
+                                  )}
+                                  <Button size="icon" variant="ghost" className="rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => {
+                                    setResult(doc);
+                                    setIsComplianceOpen(false);
+                                  }}>
+                                    <ChevronRight className="w-4 h-4" />
                                   </Button>
-                                </CardFooter>
-                              </Card>
+                                </div>
+                              </div>
                             ))}
                           </div>
-
-                          <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30 space-y-4">
-                            <h5 className="font-bold text-blue-800 dark:text-blue-400 flex items-center gap-2">
-                              <Info className="w-4 h-4" />
-                              Validation Support
-                            </h5>
-                            <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                              Need a custom validation package for your specific environment? Our regulatory experts can provide tailored IQ/OQ/PQ protocols and execution support.
-                            </p>
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs">Request Custom Package</Button>
-                          </div>
-                        </div>
-                      </ScrollArea>
+                        </ScrollArea>
+                      </div>
                     )}
 
                     {complianceTab === "api" && (
@@ -3133,13 +3866,14 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                                 </ul>
                                 <Button 
                                   onClick={() => handleSubscribe(plan.priceId)}
-                                  disabled={userProfile?.subscriptionStatus === "active" && plan.id !== "enterprise"}
+                                  disabled={userProfile?.subscriptionPlan === plan.id}
                                   className={cn(
                                     "w-full rounded-xl py-6",
-                                    plan.recommended ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-900 dark:bg-white dark:text-black"
+                                    plan.recommended ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-900 dark:bg-white dark:text-black",
+                                    userProfile?.subscriptionPlan === plan.id && "opacity-50 cursor-not-allowed bg-green-600 dark:bg-green-600 text-white"
                                   )}
                                 >
-                                  {userProfile?.subscriptionStatus === "active" ? "Current Plan" : t.subscribe}
+                                  {userProfile?.subscriptionPlan === plan.id ? "Current Plan" : "Select Plan"}
                                 </Button>
                               </div>
                             ))}
@@ -3151,20 +3885,64 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                                 <CardTitle className="text-sm dark:text-white">Organization Details</CardTitle>
                               </CardHeader>
                               <CardContent className="p-6 pt-0 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                   <div className="space-y-1">
                                     <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Company Name</p>
-                                    <p className="text-sm font-bold dark:text-white">{userProfile?.companyName}</p>
+                                    <div className="flex gap-2">
+                                      <input 
+                                        type="text"
+                                        defaultValue={userProfile?.companyName}
+                                        id="edit-company-name"
+                                        className="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl px-3 py-1.5 text-sm flex-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                                      />
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={async () => {
+                                          const newName = (document.getElementById('edit-company-name') as HTMLInputElement).value;
+                                          if (!newName || !user) return;
+                                          try {
+                                            const userRef = doc(db, "users", user.uid);
+                                            await updateDoc(userRef, { companyName: newName });
+                                            toast.success("Company name updated");
+                                            logAuditAction("BILLING_UPDATE", "COMPANY", user.uid, `Company name updated to ${newName}`);
+                                          } catch (e) {
+                                            handleError(e, ErrorCategory.FIRESTORE);
+                                          }
+                                        }}
+                                        className="rounded-xl h-auto"
+                                      >
+                                        Update
+                                      </Button>
+                                    </div>
                                   </div>
                                   <div className="space-y-1">
                                     <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Tenant ID</p>
-                                    <p className="text-sm font-mono text-blue-600">{userProfile?.tenantId}</p>
+                                    <p className="text-sm font-mono text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                      {userProfile?.tenantId}
+                                    </p>
                                   </div>
                                 </div>
                                 <div className="space-y-1">
                                   <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Your Role</p>
-                                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-green-400 border-none">{userProfile?.role}</Badge>
+                                  <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-green-400 border-none px-3 py-1 rounded-lg">
+                                    {userProfile?.role}
+                                  </Badge>
                                 </div>
+                                {userProfile?.subscriptionStatus === "active" && (
+                                  <div className="pt-4 border-t border-gray-100 dark:border-white/10 flex items-center justify-between">
+                                    <div>
+                                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Next Billing Date</p>
+                                      <p className="text-sm font-bold dark:text-white">May 18, 2026</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Payment Method</p>
+                                      <p className="text-sm font-bold dark:text-white flex items-center gap-1">
+                                        •••• 4242 <CreditCard className="w-3 h-3 text-gray-400" />
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
 
@@ -3229,6 +4007,994 @@ function Dashboard({ language, setLanguage, onBackToLanding }: { language: "en" 
                           </div>
                         </div>
                       </ScrollArea>
+                    )}
+
+                    {complianceTab === "training" && (
+                      <div className="flex-1 flex flex-col overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between">
+                          <h4 className="text-sm font-bold flex items-center gap-2 dark:text-white">
+                            <GraduationCap className="w-4 h-4 text-blue-500" />
+                            {t.training}
+                          </h4>
+                        </div>
+                        <ScrollArea className="flex-1">
+                          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {history.filter(d => d.workflowStatus === "APPROVED" || d.workflowStatus === "SIGNED").map((doc) => {
+                              const isCompleted = trainingRecords.some(tr => tr.submissionId === doc.id);
+                              return (
+                                <Card key={doc.id} className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                                  <CardHeader className="p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <Badge variant={isCompleted ? "default" : "outline"} className={cn("text-[10px]", isCompleted && "bg-green-600")}>
+                                        {isCompleted ? "Trained" : "Pending Training"}
+                                      </Badge>
+                                      <span className="text-[10px] text-gray-400">v1.0</span>
+                                    </div>
+                                    <CardTitle className="text-sm dark:text-white truncate">{doc.fileName}</CardTitle>
+                                    <CardDescription className="text-[10px]">SOP Reference: COP-{doc.id?.substring(0, 4)}</CardDescription>
+                                  </CardHeader>
+                                  <CardFooter className="p-4 pt-0">
+                                    <Button 
+                                      className="w-full text-xs h-8 rounded-lg" 
+                                      variant={isCompleted ? "outline" : "default"}
+                                      disabled={isCompleted}
+                                      onClick={async () => {
+                                        if (!user || !userProfile) return;
+                                        await addDoc(collection(db, "training_records"), {
+                                          uid: user.uid,
+                                          tenantId: userProfile.tenantId,
+                                          submissionId: doc.id,
+                                          documentTitle: doc.fileName,
+                                          completedAt: serverTimestamp()
+                                        });
+                                        toast.success("Training completion recorded");
+                                        logAuditAction("TRAINING_COMPLETE", "DOCUMENT", doc.id, `Training completed for ${doc.fileName}`);
+                                      }}
+                                    >
+                                      {isCompleted ? <CheckCircle2 className="w-3 h-3 mr-2" /> : <Eye className="w-3 h-3 mr-2" />}
+                                      {isCompleted ? t.trainingComplete : "Review & Confirm Training"}
+                                    </Button>
+                                  </CardFooter>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    )}
+
+                    {complianceTab === "capa" && (
+                      <div className="flex-1 flex flex-col overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between">
+                          <h4 className="text-sm font-bold flex items-center gap-2 dark:text-white">
+                            <Stethoscope className="w-4 h-4 text-red-500" />
+                            {t.capa}
+                          </h4>
+                          <Button size="sm" className="h-8 text-xs rounded-lg" onClick={() => {
+                            // Simple simulation of creating a CAPA
+                            toast.info("Raising new CAPA investigation...");
+                            addDoc(collection(db, "capas"), {
+                              uid: user?.uid,
+                              tenantId: userProfile?.tenantId,
+                              title: "Validation Failure Investigation",
+                              description: "Automated investigation triggered by document validation failure.",
+                              rootCause: "Scanning error / OCR misinterpretation",
+                              investigation: "Reviewing original scan quality...",
+                              preventiveAction: "Implement higher resolution scan policy",
+                              status: "Open",
+                              severity: "Major",
+                              createdAt: serverTimestamp()
+                            });
+                          }}>
+                            <Plus className="w-3 h-3 mr-2" />
+                            {language === 'ar' ? 'تحقيق جديد' : 'New Investigation'}
+                          </Button>
+                        </div>
+                        <ScrollArea className="flex-1">
+                          <div className="p-6 space-y-4">
+                            {capas.length === 0 ? (
+                              <div className="text-center py-12">
+                                <ShieldCheck className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                                <p className="text-sm text-gray-400">No active CAPA investigations</p>
+                              </div>
+                            ) : (
+                              capas.map((capa) => (
+                                <div key={capa.id} className="p-4 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="space-y-1">
+                                      <h5 className="font-bold text-sm dark:text-white">{capa.title}</h5>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">{capa.description}</p>
+                                    </div>
+                                    <Badge variant="outline" className={cn(
+                                      "text-[10px]",
+                                      capa.status === "Open" ? "text-amber-600 border-amber-200" : "text-green-600 border-green-200"
+                                    )}>
+                                      {capa.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 dark:border-white/5">
+                                    <div>
+                                      <p className="text-[10px] text-gray-400 uppercase font-bold">{t.rootCause}</p>
+                                      <p className="text-xs dark:text-gray-300 italic">"{capa.rootCause}"</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] text-gray-400 uppercase font-bold">{t.preventiveAction}</p>
+                                      <p className="text-xs dark:text-gray-300">"{capa.preventiveAction}"</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    )}
+
+                    {complianceTab === "ectd" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                        <div className="max-w-2xl mx-auto space-y-8 w-full">
+                          <div className="text-center space-y-2">
+                            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                              <Globe2 className="w-10 h-10 text-blue-600" />
+                            </div>
+                            <h4 className="text-xl font-bold dark:text-white">{t.publishToSFDA} (Simulation)</h4>
+                            <p className="text-sm text-gray-400">Convert your approved documents into an eCTD v3.2 compatible submission package.</p>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold dark:text-white">Submission Type</span>
+                                <Badge>New Drug Application (NDA)</Badge>
+                              </div>
+                              <Separator className="dark:bg-white/10" />
+                              <div className="space-y-2">
+                                <p className="text-[10px] text-gray-400 uppercase font-bold">Included Modules</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {["M1: Administrative", "M2: Summaries", "M3: Quality", "M4: Pre-clinical", "M5: Clinical"].map((m) => (
+                                    <div key={m} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                                      <CheckCircle2 className="w-3 h-3 text-green-500" />
+                                      {m}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            <Button 
+                              className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                              onClick={() => {
+                                toast.promise(
+                                  new Promise(resolve => setTimeout(resolve, 2000)),
+                                  {
+                                    loading: 'Generating XML structural elements...',
+                                    success: 'eCTD Package (ZIP) generated for SFDA submission',
+                                    error: 'Submission failed',
+                                  }
+                                );
+                              }}
+                            >
+                              <PackageCheck className="w-5 h-5 mr-2" />
+                              Generate & Publish eCTD
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "pv" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                        <div className="max-w-4xl mx-auto w-full space-y-8">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h4 className="text-lg font-bold dark:text-white">{t.safetySignals}</h4>
+                              <p className="text-sm text-gray-400">Track and report Adverse Events (AE) for post-market surveillance.</p>
+                            </div>
+                            <Button className="rounded-xl shadow-lg shadow-red-500/20 bg-red-600 hover:bg-red-700" onClick={() => {
+                              toast.info("Opening Adverse Event reporting form...");
+                              addDoc(collection(db, "adverse_events"), {
+                                uid: user?.uid,
+                                tenantId: userProfile?.tenantId,
+                                productName: "Vaxipro-B Batch #9921",
+                                patientInitials: "JD",
+                                description: "Unexpected mild rash reported 2 hours post-injection.",
+                                severity: "Mild",
+                                causality: "Possible",
+                                reportedAt: serverTimestamp(),
+                                status: "Initial"
+                              });
+                            }}>
+                              <HeartPulse className="w-4 h-4 mr-2" />
+                              Report Adverse Event
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                              { label: "Total AEs", value: adverseEvents.length, status: "Active" },
+                              { label: "Critical Signals", value: 0, status: "Normal" },
+                              { label: "Follow-ups Due", value: 2, status: "Pending" }
+                            ].map((stat, i) => (
+                              <Card key={i} className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                                <CardHeader className="p-4 pb-0">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase">{stat.label}</p>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-2">
+                                  <div className="text-2xl font-bold dark:text-white">{stat.value}</div>
+                                  <p className="text-[10px] text-green-500 font-bold mt-1">Status: {stat.status}</p>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+
+                          <div className="space-y-4">
+                            <h5 className="text-sm font-bold dark:text-white">Recent Case Files</h5>
+                            <div className="border border-gray-100 dark:border-white/10 rounded-3xl overflow-hidden bg-white dark:bg-white/5">
+                              {adverseEvents.length === 0 ? (
+                                <div className="p-12 text-center">
+                                  <Activity className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                                  <p className="text-sm text-gray-400">No safety signals detected this period.</p>
+                                </div>
+                              ) : (
+                                adverseEvents.map((ae) => (
+                                  <div key={ae.id} className="p-4 border-b border-gray-50 dark:border-white/5 last:border-0 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors group">
+                                    <div className="flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                          "w-10 h-10 rounded-xl flex items-center justify-center",
+                                          ae.severity === "Severe" ? "bg-red-50 dark:bg-red-900/20 text-red-600" : "bg-blue-50 dark:bg-blue-900/20 text-blue-600"
+                                        )}>
+                                          <ShieldAlert className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-bold dark:text-white">{ae.productName} ({ae.patientInitials})</p>
+                                          <p className="text-xs text-gray-500 truncate max-w-md">{ae.description}</p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-4">
+                                        <div className="text-right">
+                                          <Badge variant="outline" className="text-[10px] mb-1">{ae.status}</Badge>
+                                          <p className="text-[10px] text-gray-400">Severity: {ae.severity}</p>
+                                        </div>
+                                        <Button size="icon" variant="ghost" className="rounded-lg opacity-0 group-hover:opacity-100">
+                                          <ArrowRight className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "erp" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                        <div className="space-y-8">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h4 className="text-lg font-bold dark:text-white">{t.erpLive}</h4>
+                              <p className="text-sm text-gray-400">Direct integration feed from Manufacturing Execution System (MES)</p>
+                            </div>
+                            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-none">Live Connection: Operational</Badge>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {[
+                              { label: "Active Batches", value: erpData.activeBatches, icon: Factory, color: "blue" },
+                              { label: "Today's Yield", value: erpData.todayYield, icon: Activity, color: "green" },
+                              { label: "Pending QC", value: erpData.pendingQC, icon: ClipboardCheck, color: "amber" },
+                              { label: "Deviations", value: erpData.criticalDeviations, icon: ShieldAlert, color: "red" }
+                            ].map((stat, i) => {
+                              const Icon = stat.icon;
+                              return (
+                                <Card key={i} className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                                  <CardHeader className="p-4 flex flex-row items-center justify-between pb-2">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">{stat.label}</p>
+                                    <Icon className={cn("w-4 h-4", stat.color === "blue" ? "text-blue-500" : stat.color === "green" ? "text-green-500" : stat.color === "amber" ? "text-amber-500" : "text-red-500")} />
+                                  </CardHeader>
+                                  <CardContent className="p-4 pt-0">
+                                    <div className="text-2xl font-bold dark:text-white">{stat.value}</div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <Card className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                              <CardHeader>
+                                <CardTitle className="text-sm">Recent Quality Alerts</CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                {erpData.recentAlerts.map((alert) => (
+                                  <div key={alert.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10">
+                                    <div className={cn("w-2 h-2 rounded-full", alert.type === "Temp" ? "bg-red-500" : "bg-amber-500")} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-bold dark:text-white truncate">{alert.message}</p>
+                                      <p className="text-[10px] text-gray-400">{alert.time}</p>
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="h-7 text-[10px]">Investigate</Button>
+                                  </div>
+                                ))}
+                              </CardContent>
+                            </Card>
+
+                            <Card className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                              <CardHeader>
+                                <CardTitle className="text-sm">Compliance Sync Status</CardTitle>
+                              </CardHeader>
+                              <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-400">Batch Integrity Sync</span>
+                                    <span className="text-green-500 font-bold">99.9%</span>
+                                  </div>
+                                  <Progress value={99.9} className="h-1.5" />
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-400">Sensor Calibration (Master)</span>
+                                    <span className="text-blue-500 font-bold">Synced</span>
+                                  </div>
+                                  <Progress value={100} className="h-1.5" />
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "intel" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                        <div className="max-w-4xl mx-auto w-full space-y-8">
+                          <div className="space-y-1">
+                            <h4 className="text-lg font-bold dark:text-white">{t.regulatoryIntel}</h4>
+                            <p className="text-sm text-gray-400">Automated tracking of SFDA, FDA, and EMA policy changes.</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                              <h5 className="text-sm font-bold flex items-center gap-2 dark:text-white">
+                                <Rss className="w-4 h-4 text-amber-500" />
+                                {t.newsFeed}
+                              </h5>
+                              <div className="space-y-4">
+                                {regulatoryNews.map((news) => (
+                                  <Card key={news.id} className="dark:bg-white/5 border-gray-100 dark:border-white/10 hover:shadow-md transition-shadow">
+                                    <CardHeader className="p-4">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <Badge variant="outline" className="text-[10px] uppercase">{news.source}</Badge>
+                                        <span className="text-[10px] text-gray-400">{news.date}</span>
+                                      </div>
+                                      <CardTitle className="text-sm dark:text-white">{news.title}</CardTitle>
+                                      <CardDescription className="text-xs line-clamp-2">{news.summary}</CardDescription>
+                                    </CardHeader>
+                                    <CardFooter className="p-4 pt-0">
+                                      <Button variant="ghost" size="sm" className="h-8 text-xs text-blue-600 hover:text-blue-700 p-0">Read Official Publication →</Button>
+                                    </CardFooter>
+                                  </Card>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-4">
+                              <h5 className="text-sm font-bold dark:text-white">Compliance Impact Analysis (AI)</h5>
+                              <Card className="bg-blue-600 border-none text-white overflow-hidden relative">
+                                <Zap className="absolute -bottom-4 -right-4 w-32 h-32 text-white/10" />
+                                <CardHeader className="p-6">
+                                  <CardTitle className="text-lg">Policy Change Detected</CardTitle>
+                                  <CardDescription className="text-blue-100 italic">
+                                    SFDA Circular #2026-04-12: Update on CMC Documentation for biologics.
+                                  </CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-6 pt-0 space-y-4">
+                                  <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+                                    <p className="text-xs font-bold mb-2">AI Impact Summary:</p>
+                                    <p className="text-xs leading-relaxed">
+                                      3 of your current dossiers (Vaxipro, NeuroMed) require urgent CMC section updates before May 2026.
+                                    </p>
+                                  </div>
+                                  <Button className="w-full bg-white text-blue-600 hover:bg-white/90 font-bold rounded-xl">Generate Action Plan</Button>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "vendors" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                        <div className="max-w-4xl mx-auto w-full space-y-8">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h4 className="text-lg font-bold dark:text-white">{t.vendorManagement}</h4>
+                              <p className="text-sm text-gray-400">Qualify and audit suppliers/CMOs with automated risk profiling.</p>
+                            </div>
+                            <Button variant="outline" className="rounded-xl border-dashed border-2" onClick={() => {
+                              toast.info("Initializing Vendor Onboarding Workflow...");
+                              addDoc(collection(db, "vendors"), {
+                                uid: user?.uid,
+                                tenantId: userProfile?.tenantId,
+                                name: "Biotech Supplies Ltd (Riyadh)",
+                                serviceType: "Raw Material API",
+                                riskLevel: "Medium",
+                                status: "Qualified",
+                                lastAuditAt: serverTimestamp(),
+                                nextAuditAt: serverTimestamp(),
+                              });
+                            }}>
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add New Vendor
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {vendors.length === 0 ? (
+                              <div className="col-span-full border-2 border-dashed border-gray-100 dark:border-white/10 rounded-3xl p-12 text-center">
+                                <Truck className="w-12 h-12 text-gray-100 mx-auto mb-4" />
+                                <p className="text-sm text-gray-400">No vendors registered in SQM system.</p>
+                              </div>
+                            ) : (
+                              vendors.map((v) => (
+                                <Card key={v.id} className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                                  <CardHeader className="p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                      <div className={cn(
+                                        "w-12 h-12 rounded-2xl flex items-center justify-center",
+                                        v.status === "Qualified" ? "bg-green-50 dark:bg-green-900/20 text-green-600" : "bg-amber-50 dark:bg-amber-900/20 text-amber-600"
+                                      )}>
+                                        <Building2 className="w-6 h-6" />
+                                      </div>
+                                      <Badge>{v.riskLevel} Risk</Badge>
+                                    </div>
+                                    <CardTitle className="text-lg dark:text-white">{v.name}</CardTitle>
+                                    <CardDescription>{v.serviceType}</CardDescription>
+                                  </CardHeader>
+                                  <CardContent className="p-6 pt-0 space-y-4">
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-gray-400">Status</span>
+                                      <span className="font-bold text-green-500">{v.status}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-gray-400">Last Audit</span>
+                                      <span className="dark:text-white">12 Oct 2025</span>
+                                    </div>
+                                    <Separator className="dark:bg-white/10" />
+                                    <div className="flex gap-2">
+                                      <Button className="flex-1 rounded-xl h-9 text-xs" variant="outline">View Certificates</Button>
+                                      <Button className="flex-1 rounded-xl h-9 text-xs" variant="outline">Audit Trail</Button>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "search" && (
+                      <div className="flex-1 flex flex-col overflow-hidden">
+                        <div className="p-12 max-w-4xl mx-auto w-full space-y-12">
+                          <div className="text-center space-y-4">
+                            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-2xl shadow-blue-500/30">
+                              <FileSearch className="w-10 h-10 text-white" />
+                            </div>
+                            <div className="space-y-2">
+                              <h4 className="text-3xl font-bold dark:text-white tracking-tight">{t.advancedSearch}</h4>
+                              <p className="text-sm text-gray-400 max-w-md mx-auto">
+                                Search across all validated batches, audit logs, SOPs, and regulatory submissions using AI semantic matching.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="relative group max-w-2xl mx-auto">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                              <Search className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            </div>
+                            <input
+                              type="text"
+                              className="block w-full pl-12 pr-4 py-5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl text-lg shadow-xl shadow-gray-200/20 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white"
+                              placeholder="Search e.g. 'Batch #9921 deviations', 'SFDA stability guidelines'..."
+                              value={globalSearchQuery}
+                              onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                            />
+                            <div className="absolute inset-y-0 right-10 flex items-center">
+                              <kbd className="hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 dark:bg-white/10">
+                                <span className="text-xs">⌘</span>K
+                              </kbd>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                             <div className="p-4 bg-gray-50/50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors">
+                                <span className="text-sm font-bold dark:text-white">{t.versionCompare}</span>
+                                <GitCompare className="w-4 h-4 text-blue-500" />
+                             </div>
+                             <div className="p-4 bg-gray-50/50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors">
+                                <span className="text-sm font-bold dark:text-white">Batch Lineage Tree</span>
+                                <Cpu className="w-4 h-4 text-purple-500" />
+                             </div>
+                          </div>
+
+                          {globalSearchQuery && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="space-y-4 max-w-2xl mx-auto"
+                            >
+                              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest px-2">Knowledge Graph Results (Simulation)</p>
+                              {[
+                                { title: "Dossier Vaxipro-B", type: "Submission", matches: "Stability data matches SFDA 2026 update." },
+                                { title: "Batch #9921 - Temp Deviation", type: "Audit Log", matches: "Contains temperature spike alert in cold chain." },
+                                { title: "SOP-004-QC", type: "Document", matches: "Latest version with redlined sampling updates." }
+                              ].map((res, i) => (
+                                <div key={i} className="p-4 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-white/10 transition-colors cursor-pointer group">
+                                  <div>
+                                    <p className="text-sm font-bold dark:text-white">{res.title}</p>
+                                    <p className="text-xs text-blue-500 font-bold mb-1">{res.type}</p>
+                                    <p className="text-xs text-gray-500 line-clamp-1">{res.matches}</p>
+                                  </div>
+                                  <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500" />
+                                </div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "exec" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                        <div className="space-y-8">
+                           <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h4 className="text-lg font-bold dark:text-white">{t.executiveDashboard}</h4>
+                              <p className="text-sm text-gray-400">High-level quality metrics and regulatory risk overview.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                               <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Global Score: 98%</Badge>
+                               <span className="text-xs text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" /> Real-time Sync</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            <Card className="dark:bg-white/5 border-gray-100 dark:border-white/10 overflow-hidden">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2 text-gray-400 uppercase tracking-widest font-bold">
+                                  <TrendingUp className="w-4 h-4 text-blue-500" />
+                                  {t.qualityTrend}
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="h-[200px] p-0">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <LineChart data={[
+                                    { name: 'Jan', val: 92 },
+                                    { name: 'Feb', val: 94 },
+                                    { name: 'Mar', val: 93 },
+                                    { name: 'Apr', val: 98 }
+                                  ]}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#88888820" />
+                                    <XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} stroke="#888" />
+                                    <YAxis domain={[80, 100]} hide />
+                                    <RechartsTooltip 
+                                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Line type="monotone" dataKey="val" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6' }} activeDot={{ r: 6 }} />
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              </CardContent>
+                            </Card>
+
+                            <Card className="dark:bg-white/5 border-gray-100 dark:border-white/10 overflow-hidden">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2 text-gray-400 uppercase tracking-widest font-bold">
+                                  <TriangleAlert className="w-4 h-4 text-amber-500" />
+                                  Findings Distribution
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="h-[200px] p-0">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={[
+                                        { name: 'Critical', value: 1, fill: '#ef4444' },
+                                        { name: 'Major', value: 4, fill: '#f59e0b' },
+                                        { name: 'Minor', value: 15, fill: '#3b82f6' }
+                                      ]}
+                                      innerRadius={40}
+                                      outerRadius={60}
+                                      paddingAngle={8}
+                                      dataKey="value"
+                                    >
+                                      <Cell stroke="none" />
+                                    </Pie>
+                                    <RechartsTooltip />
+                                    <Legend verticalAlign="bottom" height={36} iconType="circle" fontSize={10} wrapperStyle={{ fontSize: '10px' }} />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </CardContent>
+                            </Card>
+
+                            <Card className="dark:bg-white/5 border-gray-100 dark:border-white/10 overflow-hidden lg:col-span-1">
+                               <CardHeader>
+                                  <CardTitle className="text-sm text-gray-400 uppercase tracking-widest font-bold">Training Maturity</CardTitle>
+                               </CardHeader>
+                               <CardContent className="space-y-4">
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between text-xs dark:text-white">
+                                       <span>QA Team</span>
+                                       <span className="font-bold">100%</span>
+                                    </div>
+                                    <Progress value={100} className="h-1.5" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between text-xs dark:text-white">
+                                       <span>Production Staff</span>
+                                       <span className="font-bold text-amber-500">82%</span>
+                                    </div>
+                                    <Progress value={82} className="h-1.5" />
+                                  </div>
+                                  <div className="pt-4 border-t border-gray-50 dark:border-white/5 text-center">
+                                      <p className="text-[10px] text-gray-400">Next Regulatory Audit Estimate:</p>
+                                      <p className="text-sm font-bold text-green-500">Low Risk - Audit Ready</p>
+                                  </div>
+                               </CardContent>
+                            </Card>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "change" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                        <div className="max-w-4xl mx-auto w-full space-y-8">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h4 className="text-lg font-bold dark:text-white">{t.changeControl}</h4>
+                              <p className="text-sm text-gray-400">Formal lifecycle for process, equipment, or facility modifications.</p>
+                            </div>
+                            <Button className="rounded-xl" onClick={() => {
+                               toast.info("Opening Change Control Registration...");
+                               addDoc(collection(db, "change_controls"), {
+                                 uid: user?.uid,
+                                 tenantId: userProfile?.tenantId,
+                                 title: "Replacement of Cooling Tower Pump #3",
+                                 description: "Old pump reached end of life. Replacing with newer energy-efficient model.",
+                                 reason: "Equipment obsolescence",
+                                 impactAnalysis: "Minor - Requires re-validation of water system stability.",
+                                 status: "Draft",
+                                 priority: "Medium",
+                                 createdAt: serverTimestamp()
+                               });
+                            }}>
+                              <Plus className="w-4 h-4 mr-2" />
+                              Raise Change Request
+                            </Button>
+                          </div>
+
+                          <div className="space-y-4">
+                            {changeControls.length === 0 ? (
+                               <div className="p-12 text-center border-2 border-dashed rounded-3xl border-gray-100 dark:border-white/10">
+                                  <ArrowLeftRight className="w-12 h-12 text-gray-100 mx-auto mb-4" />
+                                  <p className="text-sm text-gray-400">No active change controls.</p>
+                               </div>
+                            ) : (
+                              changeControls.map((cc) => (
+                                <Card key={cc.id} className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                                  <CardHeader className="p-4 pb-2">
+                                     <div className="flex justify-between items-start">
+                                       <div className="flex items-center gap-3">
+                                          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                                            <ArrowLeftRight className="w-4 h-4 text-blue-600" />
+                                          </div>
+                                          <div>
+                                            <CardTitle className="text-sm dark:text-white">{cc.title}</CardTitle>
+                                            <CardDescription className="text-xs uppercase font-bold text-gray-400">{cc.reason}</CardDescription>
+                                          </div>
+                                       </div>
+                                       <Badge variant={cc.status === "Draft" ? "outline" : "default"}>{cc.status}</Badge>
+                                     </div>
+                                  </CardHeader>
+                                  <CardContent className="p-4 pt-0 space-y-4">
+                                     <p className="text-xs dark:text-gray-400">{cc.description}</p>
+                                     <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10">
+                                        <p className="text-[10px] uppercase font-bold text-gray-400 mb-1">{t.impactAnalysis}</p>
+                                        <p className="text-xs italic dark:text-gray-300">"{cc.impactAnalysis}"</p>
+                                     </div>
+                                     <div className="flex justify-end gap-2 pt-2">
+                                        <Button size="sm" variant="outline" className="rounded-lg text-[10px]">Assessment</Button>
+                                        <Button size="sm" className="rounded-lg text-[10px] bg-blue-600">Submit for Approval</Button>
+                                     </div>
+                                  </CardContent>
+                                </Card>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "risk" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                         <div className="max-w-4xl mx-auto w-full space-y-8">
+                           <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h4 className="text-lg font-bold dark:text-white">{t.riskManagement}</h4>
+                              <p className="text-sm text-gray-400">Identify, evaluate, and mitigate quality risks (ICH Q9).</p>
+                            </div>
+                            <Button variant="outline" className="rounded-xl border-dashed border-2">
+                              {language === 'ar' ? 'سجل مخاطر جديد' : 'New Risk Register'}
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {risks.map((risk, i) => (
+                              <Card key={i} className="dark:bg-white/5 border-gray-100 dark:border-white/10 border-l-4 border-l-amber-500">
+                                <CardHeader className="p-4 pb-2">
+                                   <div className="flex justify-between mb-2">
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{risk.process}</p>
+                                      <Badge className={cn(risk.rpn > 50 ? "bg-red-500" : "bg-blue-500")}>RPN: {risk.rpn}</Badge>
+                                   </div>
+                                   <CardTitle className="text-sm dark:text-white">{risk.hazard}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-4">
+                                   <div className="grid grid-cols-3 gap-2">
+                                      <div className="text-center p-2 bg-gray-50/50 dark:bg-white/10 rounded-lg">
+                                         <p className="text-[10px] text-gray-400">Sev</p>
+                                         <p className="text-xs font-bold dark:text-white">{risk.severity}</p>
+                                      </div>
+                                      <div className="text-center p-2 bg-gray-50/50 dark:bg-white/10 rounded-lg">
+                                         <p className="text-[10px] text-gray-400">Prob</p>
+                                         <p className="text-xs font-bold dark:text-white">{risk.probability}</p>
+                                      </div>
+                                      <div className="text-center p-2 bg-gray-50/50 dark:bg-white/10 rounded-lg">
+                                         <p className="text-[10px] text-gray-400">Det</p>
+                                         <p className="text-xs font-bold dark:text-white">{risk.detectability}</p>
+                                      </div>
+                                   </div>
+                                   <div className="text-xs font-medium dark:text-gray-300">
+                                      <span className="text-gray-400">Mitigation: </span>
+                                      {risk.mitigation}
+                                   </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                         </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "audits" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                         <div className="max-w-4xl mx-auto w-full space-y-8">
+                             <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <h4 className="text-lg font-bold dark:text-white">{t.auditPlanning}</h4>
+                                <p className="text-sm text-gray-400">Schedule and monitor self-inspections and external audits.</p>
+                              </div>
+                              <Button className="rounded-xl shadow-lg shadow-blue-500/20 bg-blue-600 hover:bg-blue-700">
+                                <CalendarDays className="w-4 h-4 mr-2" />
+                                Add Audit Schedule
+                              </Button>
+                            </div>
+
+                            <div className="space-y-4">
+                               {auditSchedule.map((audit, i) => (
+                                 <motion.div
+                                   key={i}
+                                   initial={{ opacity: 0, x: -10 }}
+                                   animate={{ opacity: 1, x: 0 }}
+                                   transition={{ delay: i * 0.1 }}
+                                   className="p-6 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-3xl flex items-center justify-between gap-6 hover:shadow-xl transition-shadow cursor-pointer"
+                                 >
+                                    <div className="flex items-center gap-4">
+                                       <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
+                                          <ShieldCheck className="w-6 h-6 text-blue-600" />
+                                       </div>
+                                       <div>
+                                          <p className="text-sm font-bold dark:text-white">{audit.department}</p>
+                                          <p className="text-xs text-gray-400 font-medium">Auditor: {audit.auditor}</p>
+                                       </div>
+                                    </div>
+
+                                    <div className="text-right flex items-center gap-6">
+                                       <div>
+                                          <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest leading-none mb-1">Scheduled for</p>
+                                          <p className="text-sm font-bold dark:text-white">{audit.scheduledDate}</p>
+                                       </div>
+                                       <Badge variant={audit.status === "Scheduled" ? "outline" : "default"}>{audit.status}</Badge>
+                                       <Button size="icon" variant="ghost" className="rounded-full">
+                                          <ArrowRight className="w-5 h-5 text-gray-300" />
+                                       </Button>
+                                    </div>
+                                 </motion.div>
+                               ))}
+                            </div>
+                         </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "stability" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                         <div className="max-w-4xl mx-auto w-full space-y-8">
+                            <div className="flex items-center justify-between">
+                             <div className="space-y-1">
+                               <h4 className="text-lg font-bold dark:text-white">{t.stabilityManagement}</h4>
+                               <p className="text-sm text-gray-400">Track drug product stability across real-time and accelerated conditions.</p>
+                             </div>
+                             <Button className="rounded-xl">
+                               <Plus className="w-4 h-4 mr-2" />
+                               New Stability Batch
+                             </Button>
+                           </div>
+
+                           <div className="space-y-4">
+                             {stabilityStudies.map((study, i) => (
+                               <Card key={i} className="dark:bg-white/5 border-gray-100 dark:border-white/10 overflow-hidden">
+                                  <CardHeader className="p-6 bg-gray-50/50 dark:bg-white/5 border-b dark:border-white/10">
+                                     <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-4">
+                                           <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                                              <Clock className="w-6 h-6 text-amber-600" />
+                                           </div>
+                                           <div>
+                                              <CardTitle className="text-lg dark:text-white">{study.productName}</CardTitle>
+                                              <CardDescription>Batch: {study.batchNumber} | {study.condition}</CardDescription>
+                                           </div>
+                                        </div>
+                                        <Badge>{study.status}</Badge>
+                                     </div>
+                                  </CardHeader>
+                                  <CardContent className="p-6">
+                                     <div className="flex justify-between items-center mb-6">
+                                        {study.timepoints.map((tp, idx) => (
+                                          <div key={idx} className="flex flex-col items-center gap-2 relative">
+                                             <div className={cn(
+                                               "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2",
+                                               tp.status === "Completed" ? "bg-green-100 border-green-500 text-green-700" : "bg-gray-50 border-gray-200 text-gray-400"
+                                             )}>
+                                               {tp.label}
+                                             </div>
+                                             <p className="text-[10px] font-bold dark:text-white">{tp.label}</p>
+                                             {idx < study.timepoints.length - 1 && (
+                                               <div className="absolute top-4 left-10 w-20 h-[2px] bg-gray-100 dark:bg-white/10" />
+                                             )}
+                                          </div>
+                                        ))}
+                                     </div>
+                                     <div className="flex justify-between items-center bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/10">
+                                        <div className="flex items-center gap-2">
+                                           <Activity className="w-4 h-4 text-blue-500" />
+                                           <span className="text-xs font-bold dark:text-white">Degradation Profile: <span className="text-green-500">Normal</span></span>
+                                        </div>
+                                        <Button size="sm" variant="outline" className="text-xs rounded-lg">Generate ICH Report</Button>
+                                     </div>
+                                  </CardContent>
+                               </Card>
+                             ))}
+                           </div>
+                         </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "assets" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                         <div className="max-w-4xl mx-auto w-full space-y-8">
+                            <div className="flex items-center justify-between">
+                             <div className="space-y-1">
+                               <h4 className="text-lg font-bold dark:text-white">{t.assetCalibration}</h4>
+                               <p className="text-sm text-gray-400">Manage instrument calibration and facility maintenance logs.</p>
+                             </div>
+                             <div className="flex gap-2">
+                                <Button variant="outline" className="rounded-xl"><Wrench className="w-4 h-4 mr-2" /> Log Maintenance</Button>
+                                <Button className="rounded-xl"><Plus className="w-4 h-4 mr-2" /> Register Asset</Button>
+                             </div>
+                           </div>
+
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {assetCalibrations.map((asset, i) => (
+                                <Card key={i} className="dark:bg-white/5 border-gray-100 dark:border-white/10">
+                                   <CardHeader className="p-4 pb-2">
+                                      <div className="flex justify-between items-center mb-2">
+                                         <Badge className={cn(asset.status === "Valid" ? "bg-green-500" : "bg-amber-500")}>{asset.status}</Badge>
+                                         <span className="text-[10px] text-gray-400 font-bold uppercase">{asset.assetId}</span>
+                                      </div>
+                                      <CardTitle className="text-sm dark:text-white flex items-center gap-2">
+                                         <Settings2 className="w-4 h-4 text-gray-400" />
+                                         {asset.assetName}
+                                      </CardTitle>
+                                   </CardHeader>
+                                   <CardContent className="p-4 pt-0 space-y-4">
+                                      <div className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2">
+                                         <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Last Cal:</span>
+                                            <span className="font-bold dark:text-white">{asset.lastCalibrationDate}</span>
+                                         </div>
+                                         <div className="flex justify-between text-xs">
+                                            <span className="text-gray-400">Next Due:</span>
+                                            <span className="font-bold text-blue-500">{asset.nextCalibrationDate}</span>
+                                         </div>
+                                      </div>
+                                      <Button className="w-full text-xs h-8 rounded-lg" variant="ghost">View Calibration Certificate</Button>
+                                   </CardContent>
+                                </Card>
+                              ))}
+                           </div>
+                         </div>
+                      </div>
+                    )}
+
+                    {complianceTab === "release" && (
+                      <div className="flex-1 flex flex-col overflow-hidden p-8">
+                         <div className="max-w-4xl mx-auto w-full space-y-8">
+                            <div className="text-center space-y-2 mb-8">
+                               <div className="w-16 h-16 bg-black dark:bg-white rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                  <KeyRound className="w-8 h-8 text-white dark:text-black" />
+                               </div>
+                               <h4 className="text-2xl font-bold dark:text-white">{t.batchRelease}</h4>
+                               <p className="text-sm text-gray-400">{t.qpPortal}</p>
+                            </div>
+
+                            <div className="space-y-6">
+                               {batchReleases.map((br, i) => (
+                                 <Card key={i} className="dark:bg-white/5 border-gray-100 dark:border-white/10 border-t-4 border-t-black dark:border-t-white shadow-2xl">
+                                    <CardHeader className="p-6">
+                                       <div className="flex justify-between items-start">
+                                          <div>
+                                             <Badge className="mb-2">Awaiting QP Signature</Badge>
+                                             <CardTitle className="text-xl dark:text-white">Batch Release: {br.batchNumber}</CardTitle>
+                                             <CardDescription>{br.productName} | SFDA ID: 199120</CardDescription>
+                                          </div>
+                                          <div className="text-right">
+                                             <p className="text-xs text-gray-400 font-bold uppercase mb-1">Final Release Decision</p>
+                                             <p className="text-lg font-bold text-amber-500">{br.finalReleaseStatus}</p>
+                                          </div>
+                                       </div>
+                                    </CardHeader>
+                                    <CardContent className="p-6 pt-0 space-y-6">
+                                       <div className="grid grid-cols-3 gap-4">
+                                          <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 flex flex-col items-center">
+                                             <ClipboardCheck className="w-6 h-6 text-green-500 mb-2" />
+                                             <p className="text-[10px] text-gray-400 uppercase font-bold">QA Status</p>
+                                             <p className="text-sm font-bold dark:text-white">{br.qaReviewStatus}</p>
+                                          </div>
+                                          <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 flex flex-col items-center">
+                                             <Factory className="w-6 h-6 text-green-500 mb-2" />
+                                             <p className="text-[10px] text-gray-400 uppercase font-bold">Production</p>
+                                             <p className="text-sm font-bold dark:text-white">{br.productionReviewStatus}</p>
+                                          </div>
+                                          <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-2xl border border-gray-100 dark:border-white/10 flex flex-col items-center">
+                                             <Lock className="w-6 h-6 text-amber-500 mb-2" />
+                                             <p className="text-[10px] text-gray-400 uppercase font-bold">IPQC Logs</p>
+                                             <p className="text-sm font-bold dark:text-white">Validated</p>
+                                          </div>
+                                       </div>
+
+                                       <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30 flex items-start gap-4">
+                                          <ShieldCheck className="w-5 h-5 text-blue-600 mt-1" />
+                                          <div className="space-y-1">
+                                             <p className="text-sm font-bold text-blue-700 dark:text-blue-400">Certification Statement</p>
+                                             <p className="text-xs text-blue-600/80 leading-relaxed italic">
+                                                "I hereby certify that this batch has been manufactured in full compliance with GMP and the Marketing Authorization."
+                                             </p>
+                                          </div>
+                                       </div>
+
+                                       <Button className="w-full h-12 rounded-xl bg-black dark:bg-white dark:text-black font-bold">
+                                          Sign & Authorize Release
+                                       </Button>
+                                    </CardContent>
+                                 </Card>
+                               ))}
+                            </div>
+                         </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -3401,7 +5167,7 @@ function LandingPage({ onEnter, language, setLanguage }: { onEnter: () => void, 
     if (!email) return;
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/request-demo", {
+      const response = await robustFetch("/api/request-demo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

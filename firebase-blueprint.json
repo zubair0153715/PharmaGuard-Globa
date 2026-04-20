@@ -127,6 +127,97 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "name", "logic", "severity", "isActive"]
+    },
+    "CAPARecord": {
+      "title": "CAPA Record",
+      "description": "Corrective and Preventive Action records.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "In_Progress", "Resolved", "Verified"] },
+        "severity": { "type": "string", "enum": ["Critical", "Major", "Minor"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "title", "status", "severity"]
+    },
+    "TrainingRecord": {
+      "title": "Training Record",
+      "description": "Records of user training completions.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "documentTitle": { "type": "string" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "documentTitle", "completedAt"]
+    },
+    "Vendor": {
+      "title": "Vendor Profile",
+      "description": "Information about qualified vendors and suppliers.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "riskLevel": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "status": { "type": "string", "enum": ["Qualified", "On_Watch", "Disqualified"] },
+        "lastAuditAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "status"]
+    },
+    "ChangeControl": {
+      "title": "Change Control",
+      "description": "Formal change management records.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Pending_Approval", "Implemented", "Closed"] },
+        "impactAnalysis": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "title", "status"]
+    },
+    "StabilityStudy": {
+      "title": "Stability Study",
+      "description": "Long-term drug stability project tracking.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "productName": { "type": "string" },
+        "batchNumber": { "type": "string" },
+        "condition": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Completed", "Failed"] }
+      },
+      "required": ["uid", "productName", "batchNumber", "status"]
+    },
+    "AssetCalibration": {
+      "title": "Asset Calibration",
+      "description": "Equipment calibration and maintenance tracking.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "assetId": { "type": "string" },
+        "assetName": { "type": "string" },
+        "nextCalibrationDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Valid", "Expired", "Pending"] }
+      },
+      "required": ["uid", "assetId", "assetName", "status"]
+    },
+    "BatchRelease": {
+      "title": "Batch Release",
+      "description": "Final QP certification and market release record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "batchNumber": { "type": "string" },
+        "productName": { "type": "string" },
+        "finalReleaseStatus": { "type": "string", "enum": ["Released", "Quarantined", "Rejected", "Pending"] }
+      },
+      "required": ["uid", "batchNumber", "productName", "finalReleaseStatus"]
     }
   },
   "firestore": {
@@ -149,6 +240,34 @@
     "/signatures/{signatureId}": {
       "schema": "Signature",
       "description": "Electronic signature records"
+    },
+    "/capas/{capaId}": {
+      "schema": "CAPARecord",
+      "description": "CAPA records"
+    },
+    "/training_records/{recordId}": {
+      "schema": "TrainingRecord",
+      "description": "Training completion records"
+    },
+    "/vendors/{vendorId}": {
+      "schema": "Vendor",
+      "description": "Vendor management records"
+    },
+    "/change_controls/{ccId}": {
+      "schema": "ChangeControl",
+      "description": "Change management records"
+    },
+    "/stability_studies/{studyId}": {
+      "schema": "StabilityStudy",
+      "description": "Stability study records"
+    },
+    "/asset_calibrations/{assetId}": {
+      "schema": "AssetCalibration",
+      "description": "Asset calibration records"
+    },
+    "/batch_releases/{releaseId}": {
+      "schema": "BatchRelease",
+      "description": "Batch release process records"
     },
     "/logs/{logId}": {
       "schema": {

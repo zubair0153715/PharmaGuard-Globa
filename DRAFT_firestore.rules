@@ -1,0 +1,184 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Global Safety Net (Pillar 0)
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Shared Primitives & Helpers
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // To prevent O(n) explosions, avoid get() in allow list.
+    // However, for single-document get, it's allowed.
+    function getUserData() {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data : {};
+    }
+
+    function getTenantId() {
+      return getUserData().get('tenantId', '');
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (getUserData().role == 'Admin' || request.auth.token.email == "za0153715@gmail.com");
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.size() <= 255 && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Strict Key Validation (Pillar 2 & 5)
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasAll([]) && fields.hasAll(data.keys());
+    }
+
+    // ===============================================================
+    // Entity Validators (The Blueprints)
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(data, ['uid', 'email', 'displayName', 'photoURL', 'company', 'companyName', 'role', 'tenantId', 'subscriptionStatus', 'subscriptionPlan', 'subscriptionId', 'twoCheckoutCustomerId', 'orderReference', 'monthlyUsage', 'usageLimit', 'createdAt', 'lastLogin', 'sfdaMode', 'language', 'stripeCustomerId']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['QA_Manager', 'Regulatory_Officer', 'Reviewer', 'Admin'] &&
+             data.tenantId is string && data.tenantId.size() <= 128;
+    }
+
+    function isValidSubmission(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'fileName', 'checksum', 'healthScore', 'status', 'isPdfA', 'pdfAStandard', 'pdfAIssues', 'isFileNameValid', 'pageCount', 'metadata', 'aiAnalysis', 'suggestions', 'deepAudit', 'isFixed', 'correctedData', 'isSigned', 'signatureId', 'createdAt', 'updatedAt', 'timestamp', 'isEncrypted']) &&
+             data.fileName is string && data.fileName.size() <= 255 &&
+             data.healthScore is number && data.healthScore >= 0 && data.healthScore <= 100 &&
+             data.status in ['Pass', 'Fail'] &&
+             data.uid is string && data.tenantId is string;
+    }
+
+    function isValidAuditTrail(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'userEmail', 'action', 'resourceType', 'resourceId', 'details', 'previousState', 'newState', 'ipAddress', 'timestamp', 'isEncrypted']) &&
+             data.action is string && data.action.size() <= 100 &&
+             data.resourceType is string && data.resourceType.size() <= 50;
+    }
+
+    function isValidSignature(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'userEmail', 'submissionId', 'reason', 'meaning', 'hash', 'timestamp', 'isEncrypted']) &&
+             data.reason is string && data.reason.size() <= 500 &&
+             data.submissionId is string;
+    }
+
+    function isValidCustomRule(data) {
+      return hasOnlyAllowedFields(data, ['id', 'uid', 'tenantId', 'name', 'description', 'logic', 'severity', 'isActive', 'createdAt']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.logic is string && data.logic.size() <= 2000;
+    }
+
+    // ===============================================================
+    // Collection Match Blocks
+    // ===============================================================
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin(); // Only admins can list users
+      allow create: if isAuthenticated() && isValidUser(incoming()) && 
+                      incoming().createdAt == request.time && 
+                      incoming().lastLogin == request.time;
+      allow update: if isOwner(userId) && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['monthlyUsage', 'lastLogin', 'sfdaMode', 'language', 'tenantId']) &&
+         (incoming().lastLogin == request.time || incoming().lastLogin == existing().lastLogin)) ||
+        (isValidUser(incoming()) && incoming().createdAt == existing().createdAt)
+      );
+    }
+
+    match /submissions/{submissionId} {
+      function canRead() {
+        return isAuthenticated() && (resource.data.uid == request.auth.uid || resource.data.tenantId == getTenantId());
+      }
+      
+      allow get: if canRead() && isValidId(submissionId);
+      allow list: if isAuthenticated() && (resource.data.uid == request.auth.uid || resource.data.tenantId == getTenantId());
+      
+      allow create: if isAuthenticated() && isValidId(submissionId) && isValidSubmission(incoming()) &&
+                      incoming().uid == request.auth.uid &&
+                      incoming().tenantId == getTenantId() &&
+                      incoming().createdAt == request.time;
+      
+      allow update: if isAuthenticated() && isValidId(submissionId) && canRead() &&
+                      isValidSubmission(incoming()) &&
+                      incoming().uid == existing().uid &&
+                      incoming().tenantId == existing().tenantId &&
+                      incoming().createdAt == existing().createdAt &&
+                      incoming().updatedAt == request.time && (
+                        // Terminal State Lock: Can't un-sign or change core score once signed
+                        (existing().get('isSigned', false) == false) ||
+                        (incoming().diff(existing()).affectedKeys().hasOnly(['updatedAt']))
+                      );
+      
+      allow delete: if isAdmin() && isValidId(submissionId) && resource.data.tenantId == getTenantId();
+    }
+
+    match /audit_trail/{logId} {
+      allow get: if isAuthenticated() && isValidId(logId) && (resource.data.tenantId == getTenantId());
+      allow list: if isAuthenticated() && (resource.data.tenantId == getTenantId());
+      allow create: if isAuthenticated() && isValidId(logId) && isValidAuditTrail(incoming()) &&
+                      incoming().uid == request.auth.uid &&
+                      incoming().tenantId == getTenantId() &&
+                      incoming().timestamp == request.time;
+      // Audit logs are immutable
+      allow update, delete: if false;
+    }
+
+    match /signatures/{signatureId} {
+      allow get: if isAuthenticated() && isValidId(signatureId) && (resource.data.tenantId == getTenantId());
+      allow list: if isAuthenticated() && (resource.data.tenantId == getTenantId());
+      allow create: if isAuthenticated() && isValidId(signatureId) && isValidSignature(incoming()) &&
+                      incoming().uid == request.auth.uid &&
+                      incoming().tenantId == getTenantId() &&
+                      incoming().timestamp == request.time;
+      allow update, delete: if false;
+    }
+
+    match /rules/{ruleId} {
+      allow get: if isAuthenticated() && isValidId(ruleId) && (resource.data.tenantId == getTenantId());
+      allow list: if isAuthenticated() && (resource.data.tenantId == getTenantId());
+      allow create: if isAuthenticated() && isValidId(ruleId) && 
+                      (getUserData().role in ['Admin', 'QA_Manager', 'Regulatory_Officer'] || isAdmin()) &&
+                      isValidCustomRule(incoming()) &&
+                      incoming().uid == request.auth.uid &&
+                      incoming().tenantId == getTenantId() &&
+                      incoming().createdAt == request.time;
+      allow update: if isAuthenticated() && isValidId(ruleId) && 
+                      (existing().uid == request.auth.uid || isAdmin()) &&
+                      isValidCustomRule(incoming()) &&
+                      incoming().uid == existing().uid &&
+                      incoming().tenantId == existing().tenantId &&
+                      incoming().createdAt == existing().createdAt;
+      allow delete: if isAuthenticated() && isValidId(ruleId) && (existing().uid == request.auth.uid || isAdmin());
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

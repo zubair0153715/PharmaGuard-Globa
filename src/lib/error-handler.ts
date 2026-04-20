@@ -29,6 +29,8 @@ const ERROR_GUIDANCE: Record<string, string> = {
   "deadline-exceeded": "The operation took too long. Please try again with a smaller file.",
   "resource-exhausted": "Gemini API quota exceeded. Please wait a moment before trying again.",
   "invalid-argument": "The data provided is invalid. Please check your inputs.",
+  "failed to fetch": "The application could not reach the server. This usually happens if the backend is still starting up or if your internet connection was interrupted. Please wait a few seconds and try again.",
+  "load failed": "The server request failed. Please refresh the page or check your connection.",
 };
 
 export const logError = async (error: AppError) => {
